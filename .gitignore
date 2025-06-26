@@ -1,0 +1,17 @@
+# Python cache & compiled files
+__pycache__
+*.py[cod]
+
+# Virtual environments
+.venv
+venv
+
+# IDE configuration
+.vscode/
+.idea/
+
+#otros
+analysis
+analysis_output
+docs
+
