@@ -55,5 +55,3 @@ Luego, puedes iniciar la aplicación con:
 ```bash
 python -m src.main
 ```
-
-Al iniciar, la aplicación mostrará una pantalla de bienvenida donde podrás cargar tu archivo de datos (`.xlsx`).
