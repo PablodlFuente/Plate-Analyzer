@@ -18,7 +18,7 @@ def main():
     config = Config()
     config.load()
 
-    # Setup logging
+    # Setup logging solo una vez por ejecución
     logger = setup_logging(config)
 
     # Set appearance mode

@@ -6,6 +6,7 @@ import os
 import json
 import numpy as np
 import pandas as pd
+import logging
 
 class Config:
     """Class to manage application configuration."""
@@ -56,7 +57,7 @@ class Config:
             
             return True
         except Exception as e:
-            print(f"Error loading configuration: {e}")
+            logging.getLogger('plate_analyzer').error(f"Error loading configuration: {e}")
             return False
     
     def add_recent_file(self, file_path):

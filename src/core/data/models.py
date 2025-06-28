@@ -3,6 +3,7 @@ Module containing data classes and structures for plate analysis.
 """
 import numpy as np
 import pandas as pd
+import logging
 
 class PlateData:
     """Class to store and manage plate data."""
@@ -66,7 +67,7 @@ class PlateData:
                 if plate_no and assay:  # Only add if both are non-empty
                     keys.append(f"{plate_no}_{assay}")
             except Exception as e:
-                print(f"Error generating key for row {row}: {e}")
+                logging.getLogger('plate_analyzer').error(f"Error generating key for row {row}: {e}")
                 continue
                 
         return list(dict.fromkeys(keys))  # Remove duplicates while preserving order

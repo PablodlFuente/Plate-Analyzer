@@ -1606,9 +1606,11 @@ class PlateMaskApp(ctk.CTk):
                         for j in range(12):
                             writer.writerow([key, i, j, mask[i, j]])
             
-            print(f"Masks saved to {self.mask_file}")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Masks saved to {self.mask_file}")
         except Exception as e:
-            print(f"Error saving masks: {e}")
+            import logging
+logging.getLogger('plate_analyzer').error(f"Error saving masks: {e}")
 
     def save_neg_ctrl_masks_to_csv(self):
         """Save all negative control masks to a CSV file"""
@@ -1624,14 +1626,17 @@ class PlateMaskApp(ctk.CTk):
                         for j in range(12):
                             writer.writerow([key, i, j, mask[i, j]])
             
-            print(f"Negative control masks saved to {self.neg_ctrl_mask_file}")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Negative control masks saved to {self.neg_ctrl_mask_file}")
         except Exception as e:
-            print(f"Error saving negative control masks: {e}")
+            import logging
+logging.getLogger('plate_analyzer').error(f"Error saving negative control masks: {e}")
 
     def load_masks_from_csv(self):
         """Load masks from CSV if the file exists"""
         if not os.path.exists(self.mask_file):
-            print(f"Mask file {self.mask_file} not found. Using default masks.")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Mask file {self.mask_file} not found. Using default masks.")
             return
             
         try:
@@ -1655,14 +1660,17 @@ class PlateMaskApp(ctk.CTk):
                 # Update the mask map
                 self.mask_map[key] = mask
                 
-            print(f"Masks loaded from {self.mask_file}")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Masks loaded from {self.mask_file}")
         except Exception as e:
-            print(f"Error loading masks: {e}")
+            import logging
+logging.getLogger('plate_analyzer').error(f"Error loading masks: {e}")
 
     def load_neg_ctrl_masks_from_csv(self):
         """Load negative control masks from CSV if the file exists"""
         if not os.path.exists(self.neg_ctrl_mask_file):
-            print(f"Negative control mask file {self.neg_ctrl_mask_file} not found. Using default masks.")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Negative control mask file {self.neg_ctrl_mask_file} not found. Using default masks.")
             return
             
         try:
@@ -1686,9 +1694,11 @@ class PlateMaskApp(ctk.CTk):
                 # Update the mask map
                 self.neg_ctrl_mask_map[key] = mask
                 
-            print(f"Negative control masks loaded from {self.neg_ctrl_mask_file}")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Negative control masks loaded from {self.neg_ctrl_mask_file}")
         except Exception as e:
-            print(f"Error loading negative control masks: {e}")
+            import logging
+logging.getLogger('plate_analyzer').error(f"Error loading negative control masks: {e}")
 
     def save_section_grays(self):
         """Save the current gray values for the selected plate-assay"""
@@ -1758,14 +1768,17 @@ class PlateMaskApp(ctk.CTk):
                     for i, value in enumerate(values):
                         writer.writerow([key, i+1, value])
         
-            print(f"Gray values saved to {self.gray_file}")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Gray values saved to {self.gray_file}")
         except Exception as e:
-            print(f"Error saving gray values: {e}")
+            import logging
+logging.getLogger('plate_analyzer').error(f"Error saving gray values: {e}")
 
     def load_grays_from_csv(self):
         """Load gray values from CSV if the file exists"""
         if not os.path.exists(self.gray_file):
-            print(f"Gray file {self.gray_file} not found. Using default values.")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Gray file {self.gray_file} not found. Using default values.")
             return
         
         try:
@@ -1790,9 +1803,11 @@ class PlateMaskApp(ctk.CTk):
                 # Update the gray values
                 self.section_grays[key] = gray_values
             
-            print(f"Gray values loaded from {self.gray_file}")
+            import logging
+logging.getLogger('plate_analyzer').info(f"Gray values loaded from {self.gray_file}")
         except Exception as e:
-            print(f"Error loading gray values: {e}")
+            import logging
+logging.getLogger('plate_analyzer').error(f"Error loading gray values: {e}")
 
     def on_closing(self):
         """Handle window closing event"""

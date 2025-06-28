@@ -45,7 +45,8 @@ class Config:
             with open(self.config_file, 'w') as f:
                 json.dump(config_data, f, indent=2)
         except IOError as e:
-            print(f"Error saving configuration to {self.config_file}: {e}" )
+            import logging
+            logging.getLogger('plate_analyzer').error(f"Error saving configuration to {self.config_file}: {e}")
     
     def load(self):
         """Load configuration from file."""
@@ -112,7 +113,8 @@ class Config:
             
             return True
         except Exception as e:
-            print(f"Error loading configuration: {e}")
+            import logging
+            logging.getLogger('plate_analyzer').error(f"Error loading configuration: {e}")
             return False
     
     def add_recent_file(self, file_path):

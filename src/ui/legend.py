@@ -16,9 +16,10 @@ class SectionLegend(ctk.CTkFrame):
             save_callback: Callback for saving gray values.
             copy_callback: Callback for copying gray values to all plates.
         """
-        print(f"DEBUG PRE-super: id(self)={id(self)}, Class id={id(SectionLegend)}")
+        import logging
+        logging.getLogger('plate_analyzer').debug(f"DEBUG PRE-super: id(self)={id(self)}, Class id={id(SectionLegend)}")
         super().__init__(parent)
-        print(f"DEBUG POST-super: 'pack' in dir(self)? {'pack' in dir(self)}")
+        logging.getLogger('plate_analyzer').debug(f"DEBUG POST-super: 'pack' in dir(self)? {'pack' in dir(self)}")
         self.section_colors = section_colors
         self.section_grays = section_grays
         self.save_callback = save_callback

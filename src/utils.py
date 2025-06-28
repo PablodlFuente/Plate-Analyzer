@@ -26,9 +26,11 @@ def save_masks_to_csv(file_path, mask_map):
                     for j in range(12):
                         writer.writerow([key, i, j, mask[i, j]])
         
-        print(f"Masks saved to {file_path}")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Masks saved to {file_path}")
     except Exception as e:
-        print(f"Error saving masks: {e}")
+        import logging
+        logging.getLogger('plate_analyzer').error(f"Error saving masks: {e}")
 
 def load_masks_from_csv(file_path, mask_map):
     """
@@ -39,7 +41,8 @@ def load_masks_from_csv(file_path, mask_map):
         mask_map (dict): Diccionario de máscaras de pocillos a actualizar.
     """
     if not os.path.exists(file_path):
-        print(f"Mask file {file_path} not found. Using default masks.")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Mask file {file_path} not found. Using default masks.")
         return
         
     try:
@@ -63,9 +66,11 @@ def load_masks_from_csv(file_path, mask_map):
             # Actualizar el mapa de máscaras
             mask_map[key] = mask
             
-        print(f"Masks loaded from {file_path}")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Masks loaded from {file_path}")
     except Exception as e:
-        print(f"Error loading masks: {e}")
+        import logging
+        logging.getLogger('plate_analyzer').error(f"Error loading masks: {e}")
 
 def save_neg_ctrl_masks_to_csv(file_path, neg_ctrl_mask_map):
     """
@@ -87,9 +92,11 @@ def save_neg_ctrl_masks_to_csv(file_path, neg_ctrl_mask_map):
                     for j in range(12):
                         writer.writerow([key, i, j, mask[i, j]])
         
-        print(f"Negative control masks saved to {file_path}")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Negative control masks saved to {file_path}")
     except Exception as e:
-        print(f"Error saving negative control masks: {e}")
+        import logging
+        logging.getLogger('plate_analyzer').error(f"Error saving negative control masks: {e}")
 
 def load_neg_ctrl_masks_from_csv(file_path, neg_ctrl_mask_map):
     """
@@ -100,7 +107,8 @@ def load_neg_ctrl_masks_from_csv(file_path, neg_ctrl_mask_map):
         neg_ctrl_mask_map (dict): Diccionario de máscaras de controles negativos a actualizar.
     """
     if not os.path.exists(file_path):
-        print(f"Negative control mask file {file_path} not found. Using default masks.")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Negative control mask file {file_path} not found. Using default masks.")
         return
         
     try:
@@ -124,9 +132,11 @@ def load_neg_ctrl_masks_from_csv(file_path, neg_ctrl_mask_map):
             # Actualizar el mapa de máscaras
             neg_ctrl_mask_map[key] = mask
             
-        print(f"Negative control masks loaded from {file_path}")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Negative control masks loaded from {file_path}")
     except Exception as e:
-        print(f"Error loading negative control masks: {e}")
+        import logging
+        logging.getLogger('plate_analyzer').error(f"Error loading negative control masks: {e}")
 
 def save_grays_to_csv(file_path, section_grays):
     """
@@ -147,9 +157,11 @@ def save_grays_to_csv(file_path, section_grays):
                 for i, value in enumerate(values):
                     writer.writerow([key, i+1, value])
     
-        print(f"Gray values saved to {file_path}")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Gray values saved to {file_path}")
     except Exception as e:
-        print(f"Error saving gray values: {e}")
+        import logging
+        logging.getLogger('plate_analyzer').error(f"Error saving gray values: {e}")
 
 def load_grays_from_csv(file_path, section_grays):
     """
@@ -160,7 +172,8 @@ def load_grays_from_csv(file_path, section_grays):
         section_grays (dict): Diccionario de valores de grises para cada sección a actualizar.
     """
     if not os.path.exists(file_path):
-        print(f"Gray file {file_path} not found. Using default values.")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Gray file {file_path} not found. Using default values.")
         return
     
     try:
@@ -185,6 +198,8 @@ def load_grays_from_csv(file_path, section_grays):
             # Actualizar los valores de grises
             section_grays[key] = gray_values
         
-        print(f"Gray values loaded from {file_path}")
+        import logging
+        logging.getLogger('plate_analyzer').info(f"Gray values loaded from {file_path}")
     except Exception as e:
-        print(f"Error loading gray values: {e}")
+        import logging
+        logging.getLogger('plate_analyzer').error(f"Error loading gray values: {e}")

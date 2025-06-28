@@ -79,8 +79,9 @@ class PlateMaskApp(ctk.CTk):
 
     def _on_config_changed(self):
         """Handle configuration changes."""
-        # Re-setup logging to apply new level
-        setup_logging(self.config)
+        # Solo actualizar el nivel de log, sin crear nuevo archivo ni handlers
+        from src.utils.logger import setup_logging
+        setup_logging(self.config)  # Ahora solo actualiza el nivel de log
 
         # Rebuild the grid to reflect any other configuration changes
         if hasattr(self, 'grid_frame'):
@@ -96,6 +97,7 @@ class PlateMaskApp(ctk.CTk):
             self.build_grid()  # Rebuild grid to show updated excluded wells
     
     def _initialize_data(self, df):
+        import logging
         """Initialize data structures with the provided DataFrame."""
         try:
             self.df = df
@@ -127,7 +129,8 @@ class PlateMaskApp(ctk.CTk):
                                 self.section_names.append(name)
                                 self.section_wells.append(valid_wells)
                     except Exception as e:
-                        print(f"Error processing section {s}: {e}")
+                        import logging
+                        logging.getLogger('plate_analyzer').warning(f"Error processing section {s}: {e}")
                         continue
             
             # If no valid sections were loaded, use defaults
@@ -143,37 +146,31 @@ class PlateMaskApp(ctk.CTk):
                         try:
                             # Ensure limits is a 4-tuple of integers
                             if not isinstance(limits, (tuple, list)) or len(limits) != 4:
-                                print(f"Invalid limits format for section {name}: {limits}")
+                                logging.getLogger('plate_analyzer').warning(f"Invalid limits format for section {name}: {limits}")
                                 continue
-                                
                             r1, c1, r2, c2 = map(int, limits)
-                            
                             # Generate well coordinates
                             wells = []
                             for row in range(min(r1, r2), max(r1, r2) + 1):
                                 for col in range(min(c1, c2), max(c1, c2) + 1):
                                     wells.append((row, col))
-                            
                             if wells:  # Only add if we have valid wells
                                 self.sections.append((str(name), wells))
                                 self.section_names.append(str(name))
                                 self.section_wells.append(wells)
-                                
                         except (ValueError, TypeError) as e:
-                            print(f"Error creating default section {name} with limits {limits}: {e}")
+                            logging.getLogger('plate_analyzer').error(f"Error creating default section {name} with limits {limits}: {e}")
                             continue
-                            
                 except Exception as e:
-                    print(f"Error initializing default sections: {e}")
-                    import traceback
-                    print(traceback.format_exc())
-                    
+                    logging.getLogger('plate_analyzer').error(f"Error initializing default sections: {e}")
+                    traceback.print_exc()
                     # If we still don't have sections, create a single section with all wells
                     if not self.sections:
                         all_wells = [(i, j) for i in range(8) for j in range(12)]
                         self.sections = [("All Wells", all_wells)]
                         self.section_names = ["All Wells"]
                         self.section_wells = [all_wells]
+
             
             # Set section colors
             self.section_colors = getattr(self.plate_data, 'section_colors', 
@@ -198,85 +195,71 @@ class PlateMaskApp(ctk.CTk):
                 self._exclude_orphaned_wells()
                 
         except Exception as e:
-            print(f"Error in _initialize_data: {str(e)}")
+            logging.getLogger('plate_analyzer').error(f"Error in _initialize_data: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logging.getLogger('plate_analyzer').error(traceback.format_exc())
             raise  # Re-raise the exception to be handled by the caller
     
     def _exclude_orphaned_wells(self):
+        import logging
         """Exclude wells that don't belong to any section."""
         try:
             # Ensure we have the required attributes
             if not hasattr(self, 'mask_map'):
                 self.mask_map = {}
-                
             if not hasattr(self, 'keys') or not self.keys:
-                print("No plate keys found for excluding orphaned wells")
+                logging.getLogger('plate_analyzer').info("No plate keys found for excluding orphaned wells")
                 return
-                
             if not hasattr(self, 'section_wells') or not self.section_wells:
-                print("No section wells defined for excluding orphaned wells")
+                logging.getLogger('plate_analyzer').info("No section wells defined for excluding orphaned wells")
                 return
-            
             # Create a set of all possible well coordinates (0-7 rows, 0-11 cols)
             all_wells = set((i, j) for i in range(8) for j in range(12))
             section_wells = set()
-            
             # Get all wells that are in sections
             for well_list in self.section_wells:
                 if not isinstance(well_list, (list, tuple)):
                     continue
-                    
                 for well in well_list:
                     try:
                         if isinstance(well, (list, tuple)) and len(well) >= 2:
-                            # Convert to tuple of integers to make it hashable
                             row = int(well[0]) if hasattr(well, '__getitem__') else 0
                             col = int(well[1]) if hasattr(well, '__getitem__') and len(well) > 1 else 0
-                            if 0 <= row < 8 and 0 <= col < 12:  # Validate coordinates
+                            if 0 <= row < 8 and 0 <= col < 12:
                                 section_wells.add((row, col))
                     except (ValueError, TypeError, IndexError) as e:
-                        print(f"Error processing well {well}: {e}")
+                        logging.getLogger('plate_analyzer').error(f"Error processing well {well}: {e}")
                         continue
-            
             # Find orphaned wells (not in any section)
             orphaned_wells = all_wells - section_wells
-            
             if not orphaned_wells:
-                print("No orphaned wells to exclude")
+                logging.getLogger('plate_analyzer').info("No orphaned wells to exclude")
                 return
-                
-            print(f"Found {len(orphaned_wells)} orphaned wells to exclude")
-            
+            logging.getLogger('plate_analyzer').info(f"Found {len(orphaned_wells)} orphaned wells to exclude")
             # Exclude orphaned wells in all plates
             for key in list(self.keys):  # Create a copy of keys to avoid modification during iteration
                 try:
                     if not isinstance(key, str):
-                        print(f"Skipping invalid key (not a string): {key}")
+                        logging.getLogger('plate_analyzer').warning(f"Skipping invalid key (not a string): {key}")
                         continue
-                        
                     if key not in self.mask_map:
                         self.mask_map[key] = np.ones((8, 12), dtype=float)
-                    
                     mask = self.mask_map[key]
                     if not isinstance(mask, np.ndarray) or mask.shape != (8, 12):
-                        print(f"Invalid mask for {key}, resetting to default")
+                        logging.getLogger('plate_analyzer').warning(f"Invalid mask for {key}, resetting to default")
                         self.mask_map[key] = np.ones((8, 12), dtype=float)
                         mask = self.mask_map[key]
-                    
                     # Mark orphaned wells as excluded (0)
                     for i, j in orphaned_wells:
-                        if 0 <= i < 8 and 0 <= j < 12:  # Double-check bounds
+                        if 0 <= i < 8 and 0 <= j < 12:
                             mask[i, j] = 0
-                            
                 except Exception as e:
-                    print(f"Error processing plate {key}: {e}")
+                    logging.getLogger('plate_analyzer').error(f"Error processing plate {key}: {e}")
                     continue
-                        
         except Exception as e:
-            print(f"Error in _exclude_orphaned_wells: {str(e)}")
+            logging.getLogger('plate_analyzer').error(f"Error in _exclude_orphaned_wells: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logging.getLogger('plate_analyzer').error(traceback.format_exc())
 
         # Initialize masks and grays from config if available
         for key in self.keys:
@@ -811,6 +794,7 @@ class PlateMaskApp(ctk.CTk):
 
 
     def toggle_well(self, i, j):
+        import logging
         """Alterna el valor de máscara de un pocillo sin reconstruir toda la cuadrícula."""
         # Voltear máscara en la posición (i,j)
         m = self.mask_map[self.selected_key]
@@ -818,10 +802,10 @@ class PlateMaskApp(ctk.CTk):
         
         # Alternar máscara normal (incluso si es un control negativo)
         m[i,j] = 0 if m[i,j] == 1 else 1
-        print(f"DEBUG: toggle_well called with i={i}, j={j}")
-        print(f"DEBUG: len(self.buttons) = {len(self.buttons)}")
+        logging.getLogger('plate_analyzer').debug(f"toggle_well called with i={i}, j={j}")
+        logging.getLogger('plate_analyzer').debug(f"len(self.buttons) = {len(self.buttons)}")
         if len(self.buttons) > 0 and isinstance(self.buttons[0], list):
-            print(f"DEBUG: len(self.buttons[0]) = {len(self.buttons[0])}")
+            logging.getLogger('plate_analyzer').debug(f"len(self.buttons[0]) = {len(self.buttons[0])}")
         # Actualizar color del botón basado en ambas máscaras
         button = self.buttons[i][j]
         if neg_ctrl_m[i,j] == 1 and m[i,j] == 0:
@@ -844,6 +828,7 @@ class PlateMaskApp(ctk.CTk):
         self.config.update_masks(self.selected_key, self.mask_map[self.selected_key])
 
     def toggle_negative_control(self, i, j):
+        import logging
         """Alterna un pocillo como control negativo con clic derecho."""
         # Obtener máscaras
         m = self.mask_map[self.selected_key]
@@ -851,10 +836,11 @@ class PlateMaskApp(ctk.CTk):
         
         # Alternar estado de control negativo
         neg_ctrl_m[i,j] = 0 if neg_ctrl_m[i,j] == 1 else 1
-        print(f"DEBUG: toggle_negative_control called with i={i}, j={j}")
-        print(f"DEBUG: len(self.buttons) = {len(self.buttons)}")
+        import logging
+        logging.getLogger('plate_analyzer').debug(f"toggle_negative_control called with i={i}, j={j}")
+        logging.getLogger('plate_analyzer').debug(f"len(self.buttons) = {len(self.buttons)}")
         if len(self.buttons) > 0 and isinstance(self.buttons[0], list):
-            print(f"DEBUG: len(self.buttons[0]) = {len(self.buttons[0])}")
+            logging.getLogger('plate_analyzer').debug(f"len(self.buttons[0]) = {len(self.buttons[0])}")
         # Actualizar color del botón basado en ambas máscaras
         button = self.buttons[i][j]
         if neg_ctrl_m[i,j] == 1 and m[i,j] == 0:
@@ -1046,27 +1032,32 @@ class PlateMaskApp(ctk.CTk):
                     if key in self.mask_map:
                         self.config.update_masks(key, self.mask_map[key])
                     else:
-                        print(f"Warning: No mask data found for {key}, using default mask")
+                        import logging
+                        logging.getLogger('plate_analyzer').warning(f"No mask data found for {key}, using default mask")
                         self.config.update_masks(key, np.ones((8, 12), dtype=float))
                     
                     if key in self.neg_ctrl_mask_map:
                         self.config.update_neg_ctrl_masks(key, self.neg_ctrl_mask_map[key])
                     else:
-                        print(f"Warning: No negative control mask data found for {key}, using default")
+                        import logging
+                        logging.getLogger('plate_analyzer').warning(f"No negative control mask data found for {key}, using default")
                         self.config.update_neg_ctrl_masks(key, np.zeros((8, 12), dtype=float))
                     
                     if key in self.section_grays:
                         self.config.update_section_grays(key, self.section_grays[key])
                     else:
-                        print(f"Warning: No section grays data found for {key}, using default")
+                        import logging
+                        logging.getLogger('plate_analyzer').warning(f"No section grays data found for {key}, using default")
                         self.config.update_section_grays(key, [0] * 6)
                 except Exception as e:
-                    print(f"Error saving data for {key}: {str(e)}")
+                    import logging
+                    logging.getLogger('plate_analyzer').error(f"Error saving data for {key}: {str(e)}")
         
         try:
             self.config.save()
         except Exception as e:
-            print(f"Error saving configuration: {str(e)}")
+            import logging
+            logging.getLogger('plate_analyzer').error(f"Error saving configuration: {str(e)}")
         
         # Destroy the window
         self.destroy()
