@@ -64,46 +64,44 @@ class ConfigurationDialog(ctk.CTkToplevel):
             variable=self.auto_exclude_var
         )
         auto_exclude_check.pack(pady=15, anchor="w")
-        
-        # Buttons
-        buttons_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        buttons_frame.pack(side="bottom", fill="x", pady=(20, 0))
-        
-        save_btn = ctk.CTkButton(
-            buttons_frame,
-            text="Save",
-            command=self._on_save,
-            width=100
+
+        # Log level configuration
+        log_level_label = ctk.CTkLabel(self.main_frame, text="Log Level:")
+        log_level_label.pack(pady=(15, 5), anchor="w")
+
+        self.log_level_var = ctk.StringVar(value=self.config.log_level)
+        log_level_combo = ctk.CTkComboBox(
+            self.main_frame,
+            values=["ALL", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            variable=self.log_level_var,
+            width=200
         )
-        save_btn.pack(side="right", padx=5)
+        log_level_combo.pack(pady=5, anchor="w")
         
-        cancel_btn = ctk.CTkButton(
-            buttons_frame,
-            text="Cancel",
-            command=self.destroy,
-            fg_color="gray",
-            hover_color="dark gray",
-            width=100
-        )
-        cancel_btn.pack(side="right", padx=5)
+
         
         # Center the dialog
         self.update_idletasks()
         self.geometry(f"+{parent.winfo_x() + (parent.winfo_width() - self.winfo_width()) // 2}+{parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2}")
-    
-    def _on_save(self):
+
+        # Bind the closing event
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self):
         """Handle save button click."""
         # Save the section units
         self.config.section_units = self.section_units_var.get()
         
         # Save other settings
         self.config.auto_exclude_orphaned = self.auto_exclude_var.get()
+        self.config.log_level = self.log_level_var.get()
         
         # Save to file
         self.config.save()
         
         # Notify parent
-        self.on_config_saved()
+        if self.on_config_saved:
+            self.on_config_saved()
         
         # Close dialog
         self.destroy()

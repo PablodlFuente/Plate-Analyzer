@@ -13,18 +13,20 @@ from src.ui.legend import SectionLegend, WellStatusLegend
 from src.analysis import analyze_plate, analyze_all_plates
 from utils import save_masks_to_csv, load_masks_from_csv, save_neg_ctrl_masks_to_csv, load_neg_ctrl_masks_from_csv
 from utils import save_grays_to_csv, load_grays_from_csv
-from src.config import Config
+from src.modules.config import Config
 from src.ui.menu import AppMenu
+from src.utils.logger import setup_logging
 import tkinter as tk
 
 class PlateMaskApp(ctk.CTk):
     """Clase principal de la aplicación de análisis de placas."""
     
-    def __init__(self, df):
+    def __init__(self, config, df):
         """
         Inicializa la aplicación.
         
         Args:
+            config (Config): Objeto de configuración de la aplicación.
             df (pandas.DataFrame, optional): DataFrame con los datos de las placas. Puede ser None.
         """
         super().__init__()
@@ -33,8 +35,7 @@ class PlateMaskApp(ctk.CTk):
         ctk.set_appearance_mode("system")
 
         # Initialize configuration
-        self.config = Config()
-        self.config.load()
+        self.config = config
         
         # Initialize empty data structures
         self.df = df
@@ -78,7 +79,10 @@ class PlateMaskApp(ctk.CTk):
 
     def _on_config_changed(self):
         """Handle configuration changes."""
-        # Rebuild the grid to reflect any configuration changes
+        # Re-setup logging to apply new level
+        setup_logging(self.config)
+
+        # Rebuild the grid to reflect any other configuration changes
         if hasattr(self, 'grid_frame'):
             self.build_grid()
     

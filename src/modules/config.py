@@ -24,6 +24,7 @@ class Config:
         self.section_units = "grays"  # Default section units
         self.auto_exclude_orphaned = True  # Auto-exclude wells not in any section
         self.sections = []  # Store the most recently used sections
+        self.log_level = "INFO"  # Default log level
         self._dirty = False # Flag to indicate if configuration needs saving
         
     def save(self):
@@ -36,7 +37,8 @@ class Config:
             "section_grays": self.section_grays,
             "section_units": self.section_units,
             "auto_exclude_orphaned": self.auto_exclude_orphaned,
-            "sections": self.sections  # Save sections to config
+            "sections": self.sections,  # Save sections to config
+            "log_level": self.log_level
         }
         
         try:
@@ -101,6 +103,12 @@ class Config:
                 self.sections = sections
             else:
                 self.sections = []
+
+            log_level = config_data.get("log_level", "INFO")
+            if isinstance(log_level, str):
+                self.log_level = log_level
+            else:
+                self.log_level = "INFO"
             
             return True
         except Exception as e:

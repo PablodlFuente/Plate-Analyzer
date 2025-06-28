@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import copy
-from core.visualization.plots import create_2d_figure, create_3d_figure
-from core.visualization.html_generator import generate_html_content
+from src.core.visualization.plots import create_2d_figure, create_3d_figure
+from src.core.visualization.html_generator import generate_html_content
 
 def analyze_plate(df, plate, assay, mask, neg_ctrl_mask, sections, use_percentage=True, 
                  subtract_neg_ctrl=True, current_individual_plate=None):
@@ -246,12 +246,10 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
     """
     out_dir = "analysis_output"
     os.makedirs(out_dir, exist_ok=True)
-    
-    # Debug file for troubleshooting
-    debug_file = os.path.join(out_dir, "debug_info.txt")
-    with open(debug_file, 'w') as f_debug:
-        f_debug.write("Diagnostic information for plate analysis\n")
-        f_debug.write("=" * 50 + "\n\n")
+
+    # Get logger for this module
+    import logging
+    logger = logging.getLogger('plate_analyzer')
     
     try:
         writer = pd.ExcelWriter(os.path.join(out_dir, "all_results.xlsx"), engine='xlsxwriter')
@@ -268,49 +266,39 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
         plate, assay = key.split("_")
         
         # Add diagnostic information
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write(f"\nProcessing plate: {key}\n")
-            f_debug.write("-" * 30 + "\n")
+        logger.debug(f"\nProcessing plate: {key}\n")
+        logger.debug("-" * 30 + "\n")
         
         sub = df[(df['plate_no']==plate) & (df['assay']==assay)].sort_values('hours')
         
         # Check if there's data for this plate
         if sub.empty:
-            with open(debug_file, 'a') as f_debug:
-                f_debug.write(f"No data for plate {key}\n")
+            logger.warning(f"No data for plate {key}")
             continue
         
-        # Add information about found data
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write(f"Found {len(sub)} time points for {key}\n")
-            f_debug.write(f"Available hours: {sub['hours'].tolist()}\n")
+        logger.debug(f"Found {len(sub)} time points for {key}")
+        logger.debug(f"Available hours: {sub['hours'].tolist()}")
             
         mask = mask_map[key]
         neg_ctrl_mask = neg_ctrl_mask_map[key]
         
-        # Verify masks
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write(f"Mask: {np.sum(mask)} active wells out of 96\n")
-            f_debug.write(f"Negative control mask: {np.sum(neg_ctrl_mask)} marked wells out of 96\n")
+        logger.debug(f"Mask: {np.sum(mask)} active wells out of 96")
+        logger.debug(f"Negative control mask: {np.sum(neg_ctrl_mask)} marked wells out of 96")
         
         results = []
         gray_values = section_grays[key]
         
-        # Verify gray values
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write(f"Gray values: {gray_values}\n")
+        logger.debug(f"Gray values: {gray_values}")
         
         # Process each time point
         for _, row in sub.iterrows():
             data = row['data'].copy()
             hours = row['hours']
             
-            # Verify raw data
-            with open(debug_file, 'a') as f_debug:
-                f_debug.write(f"\nTime point: {hours} hours\n")
-                f_debug.write(f"Raw data range: {np.nanmin(data)} to {np.nanmax(data)}\n")
-                f_debug.write(f"Raw data mean: {np.nanmean(data)}\n")
-                f_debug.write(f"NaNs in raw data: {np.isnan(data).sum()} of {data.size}\n")
+            logger.debug(f"\nTime point: {hours} hours")
+            logger.debug(f"Raw data range: {np.nanmin(data)} to {np.nanmax(data)}")
+            logger.debug(f"Raw data mean: {np.nanmean(data)}")
+            logger.debug(f"NaNs in raw data: {np.isnan(data).sum()} of {data.size}")
             
             # Subtract negative controls if enabled
             neg_ctrl_avg = np.nan
@@ -319,16 +307,14 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
                 neg_ctrl_data = data * neg_ctrl_mask
                 valid_neg_ctrls = neg_ctrl_data[neg_ctrl_data != 0]
                 
-                with open(debug_file, 'a') as f_debug:
-                    f_debug.write(f"Valid negative controls: {len(valid_neg_ctrls)}\n")
+                logger.debug(f"Valid negative controls: {len(valid_neg_ctrls)}")
                 
                 if len(valid_neg_ctrls) > 0:
                     neg_ctrl_avg = np.nanmean(valid_neg_ctrls)
                     neg_ctrl_std = np.nanstd(valid_neg_ctrls) / np.sqrt(len(valid_neg_ctrls))  # Standard error
                     
-                    with open(debug_file, 'a') as f_debug:
-                        f_debug.write(f"Negative control mean: {neg_ctrl_avg}\n")
-                        f_debug.write(f"Negative control standard error: {neg_ctrl_std}\n")
+                    logger.debug(f"Negative control mean: {neg_ctrl_avg}")
+                    logger.debug(f"Negative control standard error: {neg_ctrl_std}")
                     
                     # Subtract from all wells
                     data = data - neg_ctrl_avg
@@ -336,20 +322,18 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
                     neg_count = np.sum(data < 0)
                     data[data < 0] = 0
                     
-                    with open(debug_file, 'a') as f_debug:
-                        f_debug.write(f"Negative values after subtracting controls: {neg_count}\n")
+                    logger.debug(f"Negative values after subtracting controls: {neg_count}")
             
             # Apply mask
             masked_data = data * mask
             
-            with open(debug_file, 'a') as f_debug:
-                f_debug.write(f"Data after applying mask - Non-zero values: {np.sum(masked_data != 0)}\n")
-                non_zero = masked_data[masked_data != 0]
-                if len(non_zero) > 0:
-                    f_debug.write(f"Non-zero value range: {np.nanmin(non_zero)} to {np.nanmax(non_zero)}\n")
-                    f_debug.write(f"Non-zero value mean: {np.nanmean(non_zero)}\n")
-                else:
-                    f_debug.write("No non-zero values after applying mask\n")
+            logger.debug(f"Data after applying mask - Non-zero values: {np.sum(masked_data != 0)}")
+            non_zero = masked_data[masked_data != 0]
+            if len(non_zero) > 0:
+                logger.debug(f"Non-zero value range: {np.nanmin(non_zero)} to {np.nanmax(non_zero)}")
+                logger.debug(f"Non-zero value mean: {np.nanmean(non_zero)}")
+            else:
+                logger.debug("No non-zero values after applying mask")
             
             # Calculate means and standard deviations for each section
             sec_means = {}
@@ -360,33 +344,28 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
                 section_data = masked_data[r1:r2+1, c1:c2+1]
                 valid_data = section_data[section_data != 0]
                 
-                with open(debug_file, 'a') as f_debug:
-                    f_debug.write(f"Section {i+1}: {len(valid_data)} valid values\n")
+                logger.debug(f"Section {i+1}: {len(valid_data)} valid values")
                 
                 if len(valid_data) > 0:
                     sec_means[f"S{i+1}"] = np.nanmean(valid_data)
                     
-                    with open(debug_file, 'a') as f_debug:
-                        f_debug.write(f"  Mean: {sec_means[f'S{i+1}']}\n")
+                    logger.debug(f"  Mean: {sec_means[f'S{i+1}']}")
                     
                     if subtract_neg_ctrl and not np.isnan(neg_ctrl_std):
                         section_std = np.nanstd(valid_data) / np.sqrt(len(valid_data))  # Standard error
                         propagated_std = np.sqrt(section_std**2 + neg_ctrl_std**2)
                         sec_stds[f"S{i+1}_std"] = propagated_std
                         
-                        with open(debug_file, 'a') as f_debug:
-                            f_debug.write(f"  Standard deviation (propagated): {propagated_std}\n")
+                        logger.debug(f"  Standard deviation (propagated): {propagated_std}")
                     else:
                         sec_stds[f"S{i+1}_std"] = np.nanstd(valid_data) / np.sqrt(len(valid_data))  # Standard error
                         
-                        with open(debug_file, 'a') as f_debug:
-                            f_debug.write(f"  Standard deviation: {sec_stds[f'S{i+1}_std']}\n")
+                        logger.debug(f"  Standard deviation: {sec_stds[f'S{i+1}_std']}")
                 else:
                     sec_means[f"S{i+1}"] = np.nan
                     sec_stds[f"S{i+1}_std"] = np.nan
                     
-                    with open(debug_file, 'a') as f_debug:
-                        f_debug.write("  No valid data for this section\n")
+                    logger.debug("  No valid data for this section")
             
             # Combine results
             combined_results = {**sec_means, **sec_stds, **neg_ctrl_info}
@@ -395,12 +374,18 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
         # Convert to DataFrame
         res_df = pd.DataFrame(results)
         
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write("\nProcessed results:\n")
-            f_debug.write(f"DataFrame shape: {res_df.shape}\n")
-            f_debug.write(f"Columns: {res_df.columns.tolist()}\n")
-            f_debug.write("First rows:\n")
-            f_debug.write(str(res_df.head()) + "\n")
+        logger.debug("\nProcessed results:")
+        logger.debug(f"DataFrame shape: {res_df.shape}")
+        logger.debug(f"Columns: {res_df.columns.tolist()}")
+        logger.debug("First rows:")
+        logger.debug(str(res_df.head()))
+        
+        # Save the DataFrame to Excel
+        res_df.to_excel(writer, sheet_name='All Results', index=False)
+        
+        # Debugging: Log final DataFrame
+        logger.debug("\nFinal DataFrame (res_df) saved to Excel:")
+        logger.debug(str(res_df.head()))
         
         # Save original values for plotting
         orig_df = res_df.copy()
@@ -412,9 +397,8 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
         for i, row in norm_df.iterrows():
             s1_value = row['S1']
             
-            with open(debug_file, 'a') as f_debug:
-                f_debug.write(f"\nNormalization for time {row['hours']} hours:\n")
-                f_debug.write(f"S1 value: {s1_value}\n")
+            logger.debug(f"\nNormalization for time {row['hours']} hours:")
+            logger.debug(f"S1 value: {s1_value}")
             
             if not np.isnan(s1_value) and s1_value != 0:  # Avoid division by zero
                 for col in [c for c in norm_df.columns if c.startswith('S') and not c.endswith('_std')]:
@@ -422,8 +406,7 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
                         # Normalize the value
                         norm_df.at[i, col] = row[col] / s1_value
                         
-                        with open(debug_file, 'a') as f_debug:
-                            f_debug.write(f"  {col}: {row[col]} / {s1_value} = {norm_df.at[i, col]}\n")
+                        logger.debug(f"  {col}: {row[col]} / {s1_value} = {norm_df.at[i, col]}")
                         
                         # Also adjust standard deviation to maintain proportion
                         std_col = f"{col}_std"
@@ -436,37 +419,32 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
                     # Relative error: std/value
                     norm_df.at[i, 'S1_std'] = s1_std / s1_value
             else:
-                with open(debug_file, 'a') as f_debug:
-                    f_debug.write("  Cannot normalize: S1 is NaN or zero\n")
+                logger.debug("  Cannot normalize: S1 is NaN or zero")
         
         # Apply percentage calculation if enabled
         if use_percentage and len(res_df) > 0:
             first_values = res_df.iloc[0].copy()
             
-            with open(debug_file, 'a') as f_debug:
-                f_debug.write("\nPercentage calculation:\n")
-                f_debug.write(f"Initial values: {first_values[first_values.index.str.startswith('S')].to_dict()}\n")
+            logger.debug("\nPercentage calculation:")
+            logger.debug(f"Initial values: {first_values[first_values.index.str.startswith('S')].to_dict()}")
             
             for col in [c for c in res_df.columns if c.startswith('S') and not c.endswith('_std')]:
                 base_value = first_values[col]
                 
-                with open(debug_file, 'a') as f_debug:
-                    f_debug.write(f"Column {col}, base value: {base_value}\n")
+                logger.debug(f"Column {col}, base value: {base_value}")
                 
                 if base_value != 0 and not np.isnan(base_value):  # Avoid division by zero and NaN
                     std_col = f"{col}_std"
                     res_df[std_col] = (res_df[std_col] / base_value) * 100
                     res_df[col] = (res_df[col] / base_value - 1) * 100
                     
-                    with open(debug_file, 'a') as f_debug:
-                        f_debug.write(f"  Converted to percentage. New values: {res_df[col].tolist()}\n")
+                    logger.debug(f"  Converted to percentage. New values: {res_df[col].tolist()}")
                 else:
                     std_col = f"{col}_std"
                     res_df[col] = np.nan
                     res_df[std_col] = np.nan
                     
-                    with open(debug_file, 'a') as f_debug:
-                        f_debug.write(f"  Cannot calculate percentage: base value is {base_value}\n")
+                    logger.debug(f"  Cannot calculate percentage: base value is {base_value}")
             
             # Rename columns for display
             display_cols = {}
@@ -549,15 +527,14 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
                 has_valid_data = True
                 break
         
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write(f"\nHas valid data for plotting? {has_valid_data}\n")
-            if not has_valid_data:
-                f_debug.write("WARNING: No valid data for plotting this plate\n")
-                # Show more details about the data
-                f_debug.write("Data details:\n")
-                for col in [c for c in res_df.columns if c.startswith('S') and not c.endswith('_std')]:
-                    f_debug.write(f"  {col}: {res_df[col].tolist()}\n")
-                    f_debug.write(f"  NaNs: {res_df[col].isna().sum()} of {len(res_df[col])}\n")
+        logger.debug(f"\nHas valid data for plotting? {has_valid_data}")
+        if not has_valid_data:
+            logger.debug("WARNING: No valid data for plotting this plate")
+            # Show more details about the data
+            logger.debug("Data details:")
+            for col in [c for c in res_df.columns if c.startswith('S') and not c.endswith('_std')]:
+                logger.debug(f"  {col}: {res_df[col].tolist()}")
+                logger.debug(f"  NaNs: {res_df[col].isna().sum()} of {len(res_df[col])}")
         
         if not has_valid_data:
             # If there's no valid data, create an empty figure with message
@@ -585,12 +562,11 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
         # Create 2D figure for this plate-assay
         plot_df = res_df if use_percentage else orig_df
         
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write("\nCreating 2D plots:\n")
-            f_debug.write(f"DataFrame for plotting shape: {plot_df.shape}\n")
-            f_debug.write(f"Columns: {plot_df.columns.tolist()}\n")
-            f_debug.write("First rows:\n")
-            f_debug.write(str(plot_df.head()) + "\n")
+        logger.debug("\nCreating 2D plots:")
+        logger.debug(f"DataFrame for plotting shape: {plot_df.shape}")
+        logger.debug(f"Columns: {plot_df.columns.tolist()}")
+        logger.debug("First rows:")
+        logger.debug(str(plot_df.head()))
         
         fig_2d = create_2d_figure(
             plot_df=plot_df,
@@ -600,17 +576,15 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
             use_bar_chart=use_bar_chart,
             subtract_neg_ctrl=subtract_neg_ctrl,
             title_prefix="Original",
-            gray_values=gray_values  # Make sure to pass gray values
-        )
+            gray_values=gray_values)
         figures_2d[key] = fig_2d
         
         # Create normalized 2D figure with S1
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write("\nCreating normalized 2D plots:\n")
-            f_debug.write(f"Normalized DataFrame shape: {norm_df.shape}\n")
-            f_debug.write(f"Columns: {norm_df.columns.tolist()}\n")
-            f_debug.write("First rows:\n")
-            f_debug.write(str(norm_df.head()) + "\n")
+        logger.debug("\nCreating normalized 2D plots:")
+        logger.debug(f"Normalized DataFrame shape: {norm_df.shape}")
+        logger.debug(f"Columns: {norm_df.columns.tolist()}")
+        logger.debug("First rows:")
+        logger.debug(str(norm_df.head()))
         
         fig_2d_norm = create_2d_figure(
             plot_df=norm_df,
@@ -626,10 +600,9 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
         figures_2d_norm[key] = fig_2d_norm
         
         # Create 3D figure for this plate-assay
-        with open(debug_file, 'a') as f_debug:
-            f_debug.write("\nCreating 3D plots:\n")
-            f_debug.write(f"Using {len(sub)} time points\n")
-            f_debug.write(f"Gray values: {gray_values}\n")
+        logger.debug("\nCreating 3D plots:")
+        logger.debug(f"Using {len(sub)} time points")
+        logger.debug(f"Gray values: {gray_values}")
         
         gray_values = section_grays[key]
         fig_3d = create_3d_figure(
@@ -645,8 +618,7 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
             show_error_bars=show_error_bars,
             use_bar_chart=use_bar_chart,
             subtract_neg_ctrl=subtract_neg_ctrl,
-            title_prefix="Original",
-            debug_file=debug_file  # Pass debug file
+            title_prefix="Original"
         )
         figures_3d[key] = fig_3d
         
@@ -665,8 +637,7 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
             use_bar_chart=use_bar_chart,
             subtract_neg_ctrl=subtract_neg_ctrl,
             title_prefix="Normalized to S1",
-            normalized_df=norm_df,
-            debug_file=debug_file  # Pass debug file
+            normalized_df=norm_df
         )
         figures_3d_norm[key] = fig_3d_norm
 
@@ -707,6 +678,6 @@ def analyze_all_plates(df, keys, mask_map, neg_ctrl_mask_map, section_grays, sec
     result_message += f"Log scale option added to the plot interface\n"
     result_message += f"Plots are responsive and will adjust to window size\n"
     result_message += f"Added normalized plots (dividing by S1 control values)\n"
-    result_message += f"Debug information saved to {debug_file}\n"
+
     
     return result_message, html_path
