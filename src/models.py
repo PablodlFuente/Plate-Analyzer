@@ -54,7 +54,7 @@ class PlateData:
         Obtiene los datos de una placa específica.
         
         Args:
-            plate_no (str): Número de placa.
+            plate_no (str): Plate number.
             assay (str): Tipo de ensayo.
             hours (float, optional): Horas específicas. Si es None, devuelve todos los tiempos.
             
@@ -77,7 +77,7 @@ class PlateData:
         Obtiene una lista de todas las placas individuales.
         
         Returns:
-            list: Lista de strings con formato 'plate_no_assay_hours'.
+            list: List of strings with format 'plate_no_assay_hours'.
         """
         if self.df.empty:
             return []

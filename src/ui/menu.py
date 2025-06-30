@@ -10,6 +10,7 @@ import customtkinter as ctk
 from src.ui.section_selector import SectionSelectorDialog
 from src.ui.configuration_dialog import ConfigurationDialog
 from src.parser import parse_spectro_excel
+from src.ui.date_confirmation_dialog import DateConfirmationDialog
 
 class AppMenu:
     """Class to manage application menus."""
@@ -69,38 +70,69 @@ class AppMenu:
     def load_file(self):
         """Open file dialog and load selected file."""
         initial_dir = self.config.default_directory if self.config.default_directory else os.getcwd()
-        file_path = filedialog.askopenfilename(
-            title="Select Data File",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        file_paths = filedialog.askopenfilenames(
+            title="Select Data Files",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
             initialdir=initial_dir
         )
         
-        if file_path:
-            self.load_specific_file(file_path)
+        if file_paths:
+            self.load_specific_file(file_paths)
     
-    def load_specific_file(self, file_path):
-        """Load a specific file.
+    def load_specific_file(self, file_paths):
+        """Load specific files.
         
         Args:
-            file_path: Path to the file to load.
+            file_paths: A list of paths to the files to load.
         """
+        if not isinstance(file_paths, (list, tuple)):
+            file_paths = [file_paths] # Ensure it's always a list
+
+        if not file_paths:
+            return
+
         try:
-            # Update default directory
-            self.config.default_directory = os.path.dirname(file_path)
-            
-            # Parse the data
-            df = parse_spectro_excel(file_path)
-            
-            # Convert numpy arrays to lists to avoid unhashable type issues
-            if not df.empty and 'data' in df.columns:
-                df['data'] = df['data'].apply(lambda x: x.tolist() if hasattr(x, 'tolist') else x)
-            
-            # Add to recent files
-            self.config.add_recent_file(file_path)
+            # Update default directory to the directory of the first file
+            self.config.default_directory = os.path.dirname(file_paths[0])
+
+            # Show date confirmation dialog
+            date_dialog = DateConfirmationDialog(self.parent, file_paths)
+            self.parent.wait_window(date_dialog)
+
+            confirmed_dates = date_dialog.get_confirmed_dates()
+            if not confirmed_dates: # User cancelled
+                messagebox.showinfo("Info", "File loading cancelled by user.")
+                return
+
+            all_dfs = []
+            for f_path in file_paths:
+                date_str = confirmed_dates.get(f_path)
+                if not date_str:
+                    messagebox.showwarning("Warning", f"No date confirmed for {os.path.basename(f_path)}. Skipping.")
+                    continue
+
+                # Parse the data, passing the extracted date string
+                df = parse_spectro_excel(f_path, date_str=date_str)
+                
+                # Convert numpy arrays to lists to avoid unhashable type issues
+                if not df.empty and 'data' in df.columns:
+                    df['data'] = df['data'].apply(lambda x: x.tolist() if hasattr(x, 'tolist') else x)
+                
+                all_dfs.append(df)
+                # Add to recent files
+                self.config.add_recent_file(f_path)
+
             self._update_recent_files_menu()
+
+            if not all_dfs:
+                messagebox.showerror("Error", "No valid data loaded from selected files.")
+                return
+
+            # Concatenate all dataframes into a single one
+            combined_df = pd.concat(all_dfs, ignore_index=True)
             
-            # Call the load callback with the modified DataFrame
-            self.load_callback(df, file_path)
+            # Call the load callback with the combined DataFrame and the first file path
+            self.load_callback(combined_df, file_paths[0])
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load file: {e}")

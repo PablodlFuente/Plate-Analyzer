@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import re
 
-def parse_spectro_excel(file_path):
+def parse_spectro_excel(file_path, date_str=None):
     """
     Analyzes a spectrophotometer Excel file and extracts plate data.
 
@@ -36,6 +36,8 @@ def parse_spectro_excel(file_path):
 
             # Extract or default to NaN
             plate_no = m_plate.group(1).upper() if m_plate else np.nan
+            if date_str:
+                plate_no = f"{plate_no}_{date_str}"
             assay = m_assay.group(1).upper() if m_assay else np.nan
             if m_hours:
                 val = int(m_hours.group(1))

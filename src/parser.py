@@ -5,12 +5,13 @@ import pandas as pd
 import numpy as np
 import re
 
-def parse_spectro_excel(file_path):
+def parse_spectro_excel(file_path, date_str=None):
     """
     Parses an Excel file with plate spectrophotometry data.
 
     Args:
         file_path (str): Path to the Excel file.
+        date_str (str, optional): Date string (YYYYMMDD) to append to plate_no for uniqueness.
     
     Returns:
         pandas.DataFrame: DataFrame with the parsed data.
@@ -37,6 +38,10 @@ def parse_spectro_excel(file_path):
 
             # Extraer o usar NaN por defecto
             plate_no = m_plate.group(1).upper() if m_plate else np.nan
+            
+            # Append date_str to plate_no if provided
+            if date_str:
+                plate_no = f"{plate_no}_{date_str}"
             assay = m_assay.group(1).upper() if m_assay else 'NaN'  # Default to 'NaN' for invalid assays
             if m_hours:
                 val = float(m_hours.group(1))  # Convert to float to handle decimal hours

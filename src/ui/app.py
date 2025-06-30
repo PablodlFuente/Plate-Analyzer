@@ -14,9 +14,15 @@ from src.analysis import analyze_plate, analyze_all_plates
 from utils import save_masks_to_csv, load_masks_from_csv, save_neg_ctrl_masks_to_csv, load_neg_ctrl_masks_from_csv
 from utils import save_grays_to_csv, load_grays_from_csv
 from src.modules.config import Config
+from tkinter import filedialog, messagebox
 from src.ui.menu import AppMenu
 from src.utils.logger import setup_logging
 import tkinter as tk
+
+
+
+
+
 
 class PlateMaskApp(ctk.CTk):
     """Main class for the plate analysis application."""
@@ -41,6 +47,9 @@ class PlateMaskApp(ctk.CTk):
         self.df = df
         self.plate_data = None
         self.keys = []
+        self.grouped_display_keys = {}
+        self.sorted_dates = []
+        self.plate_key_map = {}
         self.mask_map = {}
         self.neg_ctrl_mask_map = {}
         self.section_grays = {}
@@ -64,12 +73,22 @@ class PlateMaskApp(ctk.CTk):
         self._setup_ui()
         
         # Selección inicial
-        self.selected_key = self.keys[0] if self.keys else None
+        self.selected_date = None
+        self.selected_display_key = None
         self.selected_hour_index = 0
         
-        # Build grid if data is available
+        # Update comboboxes and build grid if data is available
         if self.df is not None:
-            self.build_grid()
+            # Update date combobox values
+            self.date_combo.configure(values=self.sorted_dates)
+            if self.sorted_dates:
+                # Set the initial selection for the date combo
+                initial_date = self.sorted_dates[0]
+                self.date_combo.set(initial_date)
+                # Manually trigger on_date_select to populate plate_assay_combo and build grid
+                self.on_date_select(initial_date)
+            else:
+                self._show_welcome_message()
         else:
             # Show welcome message if no data
             self._show_welcome_message()
@@ -98,8 +117,9 @@ class PlateMaskApp(ctk.CTk):
             self.build_grid()  # Rebuild grid to show updated excluded wells
     
     def _initialize_data(self, df):
-        import logging
         """Initialize data structures with the provided DataFrame."""
+        import logging
+        logger = logging.getLogger('plate_analyzer')
         try:
             self.df = df
             self.plate_data = PlateData(df)
@@ -107,18 +127,43 @@ class PlateMaskApp(ctk.CTk):
             # Ensure keys are valid strings
             self.keys = [str(k) for k in getattr(self.plate_data, 'keys', []) if k is not None]
 
+            # Create a structured dictionary for display keys, grouped by date
+            self.grouped_display_keys = {}
+            self.plate_key_map = {}
+            for full_key in self.keys:
+                # Assuming full_key is in format 'plateName_YYYYMMDD_assay'
+                parts = full_key.split('_')
+                if len(parts) >= 3:
+                    plate_name = parts[0]
+                    date_str = parts[1]
+                    assay = parts[2]
+                    display_key = f"{plate_name}_{assay}" # plateName_assay
+
+                    if date_str not in self.grouped_display_keys:
+                        self.grouped_display_keys[date_str] = []
+                    self.grouped_display_keys[date_str].append(display_key)
+                    self.plate_key_map[display_key] = full_key
+                    logger.info(f"Mapping: display_key='{display_key}' -> full_key='{full_key}'")
+                else:
+                    # Fallback if key format is unexpected
+                    # This case should ideally not happen if data is consistent
+                    if "Ungrouped" not in self.grouped_display_keys:
+                        self.grouped_display_keys["Ungrouped"] = []
+                    self.grouped_display_keys["Ungrouped"].append(full_key)
+                    self.plate_key_map[full_key] = full_key
+
+            # Sort dates and then keys within each date for consistent display
+            self.sorted_dates = sorted(self.grouped_display_keys.keys())
+            for date_key in self.sorted_dates:
+                self.grouped_display_keys[date_key].sort()
+
+
             # Get unique assays
             if 'assay' in self.df.columns:
                 self.assays = sorted(self.df['assay'].unique().tolist())
             else:
                 self.assays = []
 
-            # Update assay combobox if it exists
-            if hasattr(self, 'assay_combo'):
-                self.assay_combo.configure(values=self.assays)
-                if self.assays:
-                    self.assay_combo.set(self.assays[0])
-            
             # Initialize section wells
             self.sections = []
             self.section_names = []
@@ -403,12 +448,18 @@ class PlateMaskApp(ctk.CTk):
         self.top_frame.pack(pady=10, fill="x", padx=10)
         
         # Label for the dropdown
-        self.combo_label = ctk.CTkLabel(self.top_frame, text="Select Plate-Assay:")
-        self.combo_label.pack(side="left", padx=(0, 10))
-        
-        # Dropdown to select plate-assay
-        self.combo = ctk.CTkComboBox(self.top_frame, values=self.keys, command=self.on_select, width=200)
-        self.combo.pack(side="left", padx=10)
+        # Date selection
+        self.date_label = ctk.CTkLabel(self.top_frame, text="Select Date:")
+        self.date_label.pack(side="left", padx=(0, 10))
+        self.date_combo = ctk.CTkComboBox(self.top_frame, values=self.sorted_dates, command=self.on_date_select, width=150)
+        self.date_combo.pack(side="left", padx=10)
+
+        # Plate-Assay selection
+        self.plate_assay_label = ctk.CTkLabel(self.top_frame, text="Select Plate-Assay:")
+        self.plate_assay_label.pack(side="left", padx=(0, 10))
+        self.plate_assay_combo = ctk.CTkComboBox(self.top_frame, values=[], command=self.on_select, width=200)
+        self.plate_assay_combo.pack(side="left", padx=10)
+    
         
         # Advanced mode button
         self.advanced_btn = ctk.CTkButton(self.top_frame, text="Advanced Mode", command=self.toggle_advanced_mode)
@@ -517,12 +568,6 @@ class PlateMaskApp(ctk.CTk):
 
     def toggle_advanced_mode(self):
         """Alterna entre modo simple y avanzado."""
-        # Don't allow advanced mode if no data is loaded
-        if self.df is None:
-            self.result_box.delete('1.0', ctk.END)
-            self.result_box.insert(ctk.END, "Please load a data file first.")
-            return
-            
         self.advanced_mode = not self.advanced_mode
         
         # Actualizar texto del botón
@@ -545,71 +590,96 @@ class PlateMaskApp(ctk.CTk):
                 # Dropdown para selección de placa individual
                 self.plate_combo = ctk.CTkComboBox(self.advanced_frame, values=all_plates, width=300)
                 self.plate_combo.pack(side="left", padx=5)
-                
-                # Botón para cargar placa individual
-                load_btn = ctk.CTkButton(self.advanced_frame, text="Load Plate", command=self.load_individual_plate)
-                load_btn.pack(side="left", padx=5)
+                self.plate_combo.bind("<<ComboboxSelected>>", self.on_individual_plate_select)
+            
+            self.advanced_frame.pack(before=self.content_frame, pady=10, fill="x", padx=10)
+            
+            # Show the individual plate view if a plate is selected
+            if self.selected_key:
+                # Extract plate_no from the selected_key (e.g., 'P1_20250311_AB' -> 'P1')
+                # This assumes plate_no is the first part of the key before the first underscore
+                plate_no = self.selected_key.split('_')[0]
+                self.load_individual_plate(plate_no)
             else:
-                self.advanced_frame.pack(before=self.content_frame, pady=10, fill="x", padx=10)
+                self.clear_individual_plate_view()
         else:
-            # Ocultar frame avanzado
             if self.advanced_frame:
                 self.advanced_frame.pack_forget()
-        
-        # Refrescar la cuadrícula
-        self.build_grid()
+            self.clear_individual_plate_view()
 
-    def load_individual_plate(self):
-        """Carga una placa individual basada en la selección."""
-        if not self.advanced_mode or not hasattr(self, 'plate_combo'):
-            return
-            
-        selected = self.plate_combo.get()
-        if not selected:
-            return
-            
-        # Analizar la selección
-        parts = selected.split('_')
-        if len(parts) < 3:
-            return
-            
-        plate_no = parts[0]
-        assay = parts[1]
-        hours = float(parts[2])
-        
-        # Encontrar la fila correspondiente en el DataFrame
-        matching_rows = self.df[(self.df['plate_no'] == plate_no) & 
-                               (self.df['assay'] == assay) & 
-                               (self.df['hours'] == hours)]
-        
-        if matching_rows.empty:
-            self.result_box.delete('1.0', ctk.END)
-            self.result_box.insert(ctk.END, "No matching plate found.")
-            return
-            
-        # Establecer la clave seleccionada a la placa-ensayo
-        self.selected_key = f"{plate_no}_{assay}"
-        self.combo.set(self.selected_key)
-        
-        # Almacenar los datos de la placa individual
-        self.current_individual_plate = matching_rows.iloc[0]
-        
-        # Actualizar la cuadrícula
-        self.build_grid()
-        
-        # Mostrar información en el cuadro de resultados
-        self.result_box.delete('1.0', ctk.END)
-        self.result_box.insert(ctk.END, f"Loaded individual plate: {selected}\n")
-        self.result_box.insert(ctk.END, f"Hours: {hours}\n")
+    def on_date_select(self, date_choice):
+        """Handles the selection of a date from the date dropdown."""
+        self.selected_date = date_choice
+        if date_choice in self.grouped_display_keys:
+            plate_assays_for_date = self.grouped_display_keys[date_choice]
+            self.plate_assay_combo.configure(values=plate_assays_for_date)
+            if plate_assays_for_date:
+                # Automatically select the first plate-assay for the chosen date
+                self.plate_assay_combo.set(plate_assays_for_date[0])
+                self.on_select(plate_assays_for_date[0]) # Trigger selection for the first item
+            else:
+                self.plate_assay_combo.set("")
+                self.selected_display_key = None
+                self.selected_key = None
+        else:
+            self.plate_assay_combo.configure(values=[])
+            self.plate_assay_combo.set("")
+            self.selected_display_key = None
+            self.selected_key = None
 
-    def on_select(self, choice):
-        """Maneja la selección de una placa-ensayo diferente."""
-        self.selected_key = choice
+    def on_select(self, plate_assay_choice):
+        """Handles the selection of a plate-assay from the plate-assay dropdown."""
+        import logging
+        logger = logging.getLogger('plate_analyzer')
+
+        self.selected_display_key = plate_assay_choice
+        logger.info(f"on_select called with plate_assay_choice: {plate_assay_choice}")
+        logger.info(f"Current selected_date: {self.selected_date}")
+
+        # Construct the full key using the selected date and plate-assay
+        if self.selected_date and self.selected_display_key:
+            logger.info(f"Attempting to find full key for date: {self.selected_date}, display: {self.selected_display_key}")
+            found_full_key = None
+            for display_key_in_map, full_key_in_map in self.plate_key_map.items():
+                # Check if the display_key matches and the full_key contains the selected date
+                if display_key_in_map == self.selected_display_key and self.selected_date in full_key_in_map:
+                    found_full_key = full_key_in_map
+                    logger.info(f"Found matching full_key: {found_full_key}")
+                    break
+            self.selected_key = found_full_key
+        else:
+            self.selected_key = None
+            logger.info("selected_date or selected_display_key is None, cannot determine full key.")
+
+        logger.info(f"Final selected_key: {self.selected_key}")
+
         self.selected_hour_index = 0
-        # Limpiar selección de placa individual en modo avanzado
+        # Clear individual plate selection in advanced mode
         if hasattr(self, 'current_individual_plate'):
             delattr(self, 'current_individual_plate')
-        self.build_grid()
+        
+        if self.selected_key:
+            self.build_grid()
+        else:
+            # Clear grid or show a message if no valid selection
+            self.clear_grid() # Assuming you have a clear_grid method or similar
+
+    def on_individual_plate_select(self, plate_no):
+        """Handles the selection of an individual plate in advanced mode."""
+        print(f"Individual plate selected: {plate_no}")
+        # TODO: Implement actual loading and display of the individual plate data
+
+    def load_individual_plate(self, plate_no):
+        """Placeholder for loading an individual plate."""
+        print("Load individual plate button clicked.")
+
+    def clear_grid(self):
+        """Clears the grid display."""
+        for widget in self.grid_frame.winfo_children():
+            widget.destroy()
+        if hasattr(self, 'legend_frame'):
+            for widget in self.legend_frame.winfo_children():
+                widget.destroy()
 
     def build_grid(self):
         """Construye la cuadrícula de pocillos y la leyenda."""
@@ -629,7 +699,9 @@ class PlateMaskApp(ctk.CTk):
         if not self.selected_key:
             return
             
-        plate, assay = self.selected_key.split("_")
+        parts = self.selected_key.split("_")
+        plate = parts[0]
+        assay = parts[-1]
         
         # Get all wells that are in sections
         section_wells_set = set()
@@ -809,6 +881,61 @@ class PlateMaskApp(ctk.CTk):
         selected_assay = self.assay_combo.get()
         if selected_assay:
             self.copy_to_assay(selected_assay)
+
+    def analyze_this_plate(self):
+        """Analiza solo la placa actualmente seleccionada."""
+        import logging
+        logger = logging.getLogger('plate_analyzer')
+        if not self.selected_key:
+            self.result_box.delete('1.0', ctk.END)
+            self.result_box.insert(ctk.END, "No plate selected for analysis.\n")
+            return
+
+        # Get options
+        use_percentage = self.percent_var.get()
+        show_error_bars = self.error_bars_var.get()
+        use_bar_chart = self.bar_chart_var.get()
+        subtract_neg_ctrl = self.subtract_neg_ctrl_var.get()
+
+        # Convert sections to expected format (r1, c1, r2, c2)
+        section_limits = []
+        for section_name, wells in self.sections:
+            if wells:
+                rows = [w[0] for w in wells]
+                cols = [w[1] for w in wells]
+                section_limits.append((min(rows), min(cols), max(rows), max(cols)))
+
+        # If no sections, use the entire plate
+        if not section_limits:
+            section_limits = [(0, 0, 7, 11)]  # Entire plate
+
+        try:
+            result_message, html_path = analyze_plate(
+                df=self.df,
+                plate_key=self.selected_key,
+                mask_map=self.mask_map,
+                neg_ctrl_mask_map=self.neg_ctrl_mask_map,
+                section_grays=self.section_grays,
+                sections=section_limits,
+                section_colors=self.section_colors,
+                use_percentage=use_percentage,
+                show_error_bars=show_error_bars,
+                use_bar_chart=use_bar_chart,
+                subtract_neg_ctrl=subtract_neg_ctrl
+            )
+
+            # Show result message
+            self.result_box.delete('1.0', ctk.END)
+            self.result_box.insert(ctk.END, result_message)
+
+            # Open HTML file in default browser
+            if html_path:
+                webbrowser.open('file://' + os.path.abspath(html_path))
+
+        except Exception as e:
+            logger.error(f"Error analyzing plate {self.selected_key}: {str(e)}", exc_info=True)
+            self.result_box.delete('1.0', ctk.END)
+            self.result_box.insert(ctk.END, f"Error analyzing plate {self.selected_key}: {str(e)}\n")
 
     def copy_to_same_plate(self):
         """Copia la máscara actual a todos los puntos de tiempo de la misma placa."""
@@ -1023,8 +1150,11 @@ class PlateMaskApp(ctk.CTk):
         
         # No need to rebuild the grid, just update the internal data
     
+
     def load_file(self, df, file_path):
         """Load a new file and initialize the application with it."""
+        import logging
+        logger = logging.getLogger('plate_analyzer')
         try:
             if df is None or df.empty:
                 self.result_box.delete('1.0', ctk.END)
@@ -1042,57 +1172,32 @@ class PlateMaskApp(ctk.CTk):
                 self.result_box.insert(ctk.END, f"Error: No valid plate-assay combinations found in {file_path}\n")
                 return
             
-            # Update the combo box with new keys
-            if hasattr(self, 'combo'):
-                self.combo.configure(values=self.keys)
-            
-            # Select the first key
-            if self.keys:
-                self.selected_key = self.keys[0]
-                if hasattr(self, 'combo'):
-                    self.combo.set(self.selected_key)
+            # Update date combobox values
+            if hasattr(self, 'date_combo'):
+                self.date_combo.configure(values=self.sorted_dates)
+                if self.sorted_dates:
+                    initial_date = self.sorted_dates[0]
+                    self.date_combo.set(initial_date)
+                    self.on_date_select(initial_date) # Trigger selection for the first date
+                else:
+                    self.date_combo.set("")
+                    self.plate_assay_combo.configure(values=[])
+                    self.plate_assay_combo.set("")
+                    self.selected_key = None
+                    self.clear_grid()
             
             # Enable buttons
             self._set_buttons_state(tk.NORMAL)
-            
-            # Rebuild the grid
-            self.build_grid()
             
             # Show confirmation
             self.result_box.delete('1.0', ctk.END)
             self.result_box.insert(ctk.END, f"Successfully loaded file: {file_path}\n")
             self.result_box.insert(ctk.END, f"Found {len(self.keys)} plate-assay combinations\n")
-            
+                
         except Exception as e:
+            logger.error(f"Error loading file {file_path}: {str(e)}", exc_info=True)
             self.result_box.delete('1.0', ctk.END)
             self.result_box.insert(ctk.END, f"Error loading file {file_path}: {str(e)}\n")
             import traceback
             self.result_box.insert(ctk.END, f"Traceback: {traceback.format_exc()}\n")
 
-    def analyze_this_plate(self):
-        """Analyze current plate and show section summary table."""
-        # Analyze only this plate using full analysis pipeline
-        if not self.selected_key:
-            return
-        plate, assay = self.selected_key.split("_")
-        mask = self.mask_map[self.selected_key]
-        neg_ctrl_mask = self.neg_ctrl_mask_map[self.selected_key]
-        sections = self.grid_sections
-        use_percentage = self.percent_var.get()
-        subtract_neg_ctrl = self.subtract_neg_ctrl_var.get()
-
-        result_text = analyze_plate(
-            self.df,
-            plate,
-            assay,
-            mask,
-            neg_ctrl_mask,
-            sections,
-            use_percentage,
-            subtract_neg_ctrl,
-            getattr(self, 'current_individual_plate', None)
-        )
-
-        # Show in result box
-        self.result_box.delete('1.0', ctk.END)
-        self.result_box.insert(tk.END, result_text)

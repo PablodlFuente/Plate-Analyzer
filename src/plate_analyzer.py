@@ -227,12 +227,12 @@ class PlateMaskApp(ctk.CTk):
             
         # Parse the selection
         parts = selected.split('_')
-        if len(parts) < 3:
+        if len(parts) < 4:
             return
             
-        plate_no = parts[0]
-        assay = parts[1]
-        hours = float(parts[2])
+        plate_no = f"{parts[0]}_{parts[1]}"
+        assay = parts[2]
+        hours = float(parts[3])
         
         # Find the matching row in the dataframe
         matching_rows = self.df[(self.df['plate_no'] == plate_no) & 
