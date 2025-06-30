@@ -1,30 +1,30 @@
 """
-Módulo para la visualización de datos de placas.
+Module for plate data visualization.
 """
 import numpy as np
 import plotly.graph_objects as go
 from scipy import interpolate
 
-# Modificar la función create_2d_figure para añadir argumentos para título personalizado
+# Modified create_2d_figure function to add arguments for custom title
 def create_2d_figure(plot_df, key, use_percentage=True, show_error_bars=True, use_bar_chart=False, subtract_neg_ctrl=True, 
                     title_prefix="", is_normalized=False, gray_values=None, section_units="grays"):
     """
-    Crea una figura 2D para una placa-ensayo.
+    Creates a 2D figure for a plate-assay.
     
     Args:
-        plot_df (pandas.DataFrame): DataFrame con los datos a graficar.
-        key (str): Clave placa-ensayo.
-        use_percentage (bool, optional): Si se deben mostrar los resultados como porcentaje. Por defecto True.
-        show_error_bars (bool, optional): Si se deben mostrar barras de error. Por defecto True.
-        use_bar_chart (bool, optional): Si se debe usar gráfico de barras en lugar de líneas. Por defecto False.
-        subtract_neg_ctrl (bool, optional): Si se restaron los controles negativos. Por defecto True.
-        title_prefix (str, optional): Prefijo para el título. Por defecto "".
-        is_normalized (bool, optional): Si los datos están normalizados. Por defecto False.
-        gray_values (list, optional): Lista de valores de grises para cada sección. Por defecto None.
-        section_units (str, optional): Unidades para los valores de sección. Por defecto "grays".
+        plot_df (pandas.DataFrame): DataFrame with the data to plot.
+        key (str): Plate-assay key.
+        use_percentage (bool, optional): Whether to show results as percentage. Default is True.
+        show_error_bars (bool, optional): Whether to show error bars. Default is True.
+        use_bar_chart (bool, optional): Whether to use bar chart instead of lines. Default is False.
+        subtract_neg_ctrl (bool, optional): Whether negative controls were subtracted. Default is True.
+        title_prefix (str, optional): Prefix for the title. Default is "".
+        is_normalized (bool, optional): Whether the data is normalized. Default is False.
+        gray_values (list, optional): List of gray values for each section. Default is None.
+        section_units (str, optional): Units for section values. Default is "grays".
         
     Returns:
-        plotly.graph_objects.Figure: Figura 2D.
+        plotly.graph_objects.Figure: 2D figure.
     """
     fig = go.Figure()
     
@@ -184,51 +184,51 @@ def create_2d_figure(plot_df, key, use_percentage=True, show_error_bars=True, us
 
     return fig
 
-# Modificar la función create_3d_figure para añadir soporte para normalización con S1
+# Modified create_3d_figure function to add support for normalization with S1
 def create_3d_figure(df, plate, assay, mask, neg_ctrl_mask, sections, section_colors, gray_values,
                     use_percentage=True, show_error_bars=True, use_bar_chart=False, subtract_neg_ctrl=True,
                     title_prefix="", normalized_df=None, debug_file=None, section_units="grays"):
     """
-    Crea una figura 3D para una placa-ensayo.
+    Creates a 3D figure for a plate-assay.
 
     Args:
-        df (pandas.DataFrame): DataFrame con los datos de las placas.
-        plate (str): Número de placa.
-        assay (str): Tipo de ensayo.
-        mask (numpy.ndarray): Máscara de pocillos (8x12).
-        neg_ctrl_mask (numpy.ndarray): Máscara de controles negativos (8x12).
-        sections (list): Lista de tuplas con los límites de cada sección.
-        section_colors (list): Lista de colores para cada sección.
-        gray_values (list): Lista de valores de grises para cada sección.
-        use_percentage (bool, optional): Si se deben mostrar los resultados como porcentaje. Por defecto True.
-        show_error_bars (bool, optional): Si se deben mostrar barras de error. Por defecto True.
-        use_bar_chart (bool, optional): Si se debe usar gráfico de barras en lugar de superficie. Por defecto False.
-        subtract_neg_ctrl (bool, optional): Si se deben restar los controles negativos. Por defecto True.
-        title_prefix (str, optional): Prefijo para el título. Por defecto "".
-        normalized_df (pandas.DataFrame, optional): DataFrame con datos normalizados. Por defecto None.
-        debug_file (str, optional): Ruta al archivo de depuración. Por defecto None.
-        section_units (str, optional): Unidades para los valores de sección. Por defecto "grays".
+        df (pandas.DataFrame): DataFrame with plate data.
+        plate (str): Plate number.
+        assay (str): Assay type.
+        mask (numpy.ndarray): Well mask (8x12).
+        neg_ctrl_mask (numpy.ndarray): Negative control mask (8x12).
+        sections (list): List of tuples with the limits of each section.
+        section_colors (list): List of colors for each section.
+        gray_values (list): List of gray values for each section.
+        use_percentage (bool, optional): Whether to show results as percentage. Default is True.
+        show_error_bars (bool, optional): Whether to show error bars. Default is True.
+        use_bar_chart (bool, optional): Whether to use bar chart instead of lines. Default is False.
+        subtract_neg_ctrl (bool, optional): Whether negative controls were subtracted. Default is True.
+        title_prefix (str, optional): Prefix for the title. Default is "".
+        normalized_df (pandas.DataFrame, optional): DataFrame with normalized data. Default is None.
+        debug_file (str, optional): File to write debug messages. Default is None.
+        section_units (str, optional): Units for section values. Default is "grays".
 
     Returns:
-        plotly.graph_objects.Figure: Figura 3D.
+        plotly.graph_objects.Figure: 3D figure.
     """
-    # Función para escribir en el archivo de depuración
+    # Function to write to the debug file
     def write_debug(message):
         if debug_file:
             with open(debug_file, 'a') as f:
                 f.write(message + "\n")
 
-    write_debug(f"\nCreando figura 3D para {plate}_{assay}")
+    write_debug(f"\nCreating 3D figure for {plate}_{assay}")
 
     sub = df[(df['plate_no']==plate) & (df['assay']==assay)].sort_values('hours')
 
     # Saltar si no hay datos
     if sub.empty:
-        write_debug("No hay datos para esta placa")
+        write_debug("No data for this plate")
         return go.Figure()
 
-    write_debug(f"Encontrados {len(sub)} puntos de tiempo")
-    write_debug(f"Horas disponibles: {sub['hours'].tolist()}")
+    write_debug(f"Found {len(sub)} time points")
+    write_debug(f"Available hours: {sub['hours'].tolist()}")
 
     # Crear figura 3D
     fig3d = go.Figure()
@@ -242,7 +242,7 @@ def create_3d_figure(df, plate, assay, mask, neg_ctrl_mask, sections, section_co
 
     # Si tenemos datos normalizados, usarlos directamente
     if normalized_df is not None:
-        write_debug("Usando datos normalizados proporcionados")
+        write_debug("Using provided normalized data")
 
         # Get the actual section columns that exist in the normalized dataframe
         available_sections = [col for col in normalized_df.columns if col.startswith('S') and not col.endswith('_std')]
@@ -268,7 +268,7 @@ def create_3d_figure(df, plate, assay, mask, neg_ctrl_mask, sections, section_co
                         all_stds.append(0)
                     all_sections.append(section_num + 1)  # Convert back to 1-based
     else:
-        write_debug("Calculando datos desde cero")
+        write_debug("Calculating data from scratch")
 
         # Primera pasada: recopilar todos los datos brutos
         # Use the actual number of sections available
@@ -321,7 +321,7 @@ def create_3d_figure(df, plate, assay, mask, neg_ctrl_mask, sections, section_co
 
         # Segunda pasada: aplicar cálculo de porcentaje si es necesario
         if use_percentage:
-            write_debug("Aplicando cálculo de porcentaje")
+            write_debug("Applying percentage calculation")
 
             # Agrupar por sección
             section_data = {}
@@ -352,17 +352,17 @@ def create_3d_figure(df, plate, assay, mask, neg_ctrl_mask, sections, section_co
 
     # Saltar si no hay datos válidos
     if not all_hours:
-        write_debug("No hay datos válidos para crear la figura 3D")
+        write_debug("No valid data to create 3D figure")
         fig3d = go.Figure()
         fig3d.add_annotation(
-            text="No hay datos válidos para esta placa",
+            text="No valid data for this plate",
             xref="paper", yref="paper",
             x=0.5, y=0.5,
             showarrow=False,
             font=dict(size=20)
         )
         fig3d.update_layout(
-            title=f"No hay datos válidos para {plate}_{assay}",
+            title=f"No valid data for {plate}_{assay}",
             height=600,
             width=900
         )
@@ -370,7 +370,7 @@ def create_3d_figure(df, plate, assay, mask, neg_ctrl_mask, sections, section_co
 
     # Determinar si se debe usar gráfico de barras o superficie
     if use_bar_chart:
-        write_debug("Creando gráfico de barras 3D")
+        write_debug("Creating 3D bar chart")
 
         # Obtener puntos de tiempo únicos y ordenarlos
         unique_hours = sorted(list(set(all_hours)))
@@ -542,19 +542,19 @@ def create_3d_figure(df, plate, assay, mask, neg_ctrl_mask, sections, section_co
     write_debug("Figura 3D creada exitosamente")
     return fig3d
 
-# Modificar la función generate_html_content para soportar las gráficas normalizadas
+# Modified generate_html_content function to support normalized plots
 def generate_html_content(figures_2d, figures_2d_norm, figures_3d, figures_3d_norm):
     """
-    Genera contenido HTML para visualizar figuras 2D y 3D, originales y normalizadas.
+    Generates HTML content to visualize 2D and 3D figures, both original and normalized.
 
     Args:
-        figures_2d (dict): Diccionario de figuras 2D originales.
-        figures_2d_norm (dict): Diccionario de figuras 2D normalizadas.
-        figures_3d (dict): Diccionario de figuras 3D originales.
-        figures_3d_norm (dict): Diccionario de figuras 3D normalizadas.
+        figures_2d (dict): Dictionary of original 2D figures.
+        figures_2d_norm (dict): Dictionary of normalized 2D figures.
+        figures_3d (dict): Dictionary of original 3D figures.
+        figures_3d_norm (dict): Dictionary of normalized 3D figures.
 
     Returns:
-        str: Contenido HTML.
+        str: HTML content.
     """
     html_content = """
 <!DOCTYPE html>

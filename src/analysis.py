@@ -1,5 +1,5 @@
 """
-Módulo para el análisis de datos de placas.
+Module for plate data analysis.
 """
 import os
 import numpy as np
@@ -11,26 +11,27 @@ import copy
 def analyze_plate(df, plate, assay, mask, neg_ctrl_mask, sections, use_percentage=True, 
                  subtract_neg_ctrl=True, current_individual_plate=None):
     """
-    Analiza una placa específica y devuelve los resultados como texto.
-    
+    Analyzes a specific plate and returns the results as text.
+
     Args:
-        df (pandas.DataFrame): DataFrame con los datos de las placas.
-        plate (str): Número de placa.
-        assay (str): Tipo de ensayo.
-        mask (numpy.ndarray): Máscara de pocillos (8x12).
-        neg_ctrl_mask (numpy.ndarray): Máscara de controles negativos (8x12).
-        sections (list): Lista de tuplas con los límites de cada sección.
-        use_percentage (bool, optional): Si se deben mostrar los resultados como porcentaje. Por defecto True.
-        subtract_neg_ctrl (bool, optional): Si se deben restar los controles negativos. Por defecto True.
-        current_individual_plate (pandas.Series, optional): Datos de la placa individual seleccionada.
-        
+        df (pandas.DataFrame): DataFrame with plate data.
+        plate (str): Plate number.
+        assay (str): Assay type.
+        mask (numpy.ndarray): Well mask 
+        neg_ctrl_mask (numpy.ndarray): Negative control mask 
+        sections (list): List of tuples with the limits of each section.
+        use_percentage (bool, optional): Whether to show results as percentage. Default is True.
+        subtract_neg_ctrl (bool, optional): Whether to subtract negative controls. Default is True.
+        current_individual_plate (pandas.Series, optional): Data of the selected individual plate.
+    
     Returns:
-        str: Texto con los resultados del análisis.
+        str: Analysis results as text.
     """
     result_text = ""
     
-    # Si en modo avanzado y una placa individual está seleccionada
+    # If in advanced mode and an individual plate is selected
     if current_individual_plate is not None:
+        # Analyze only this individual plate
         # Analizar solo esta placa individual
         data = current_individual_plate['data'].copy()
         hours = current_individual_plate['hours']

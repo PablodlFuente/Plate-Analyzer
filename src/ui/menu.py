@@ -26,24 +26,24 @@ class AppMenu:
         self.config = config
         self.load_callback = load_callback
         self.on_config_changed = None
-        
+
         # Create menu
         self.menu = tk.Menu(parent)
         parent.configure(menu=self.menu)
-        
+
         # File menu
         self.file_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="File", menu=self.file_menu)
         self.file_menu.add_command(label="Load Data File...", command=self.load_file)
-        
+
         # Recent files submenu
         self.recent_menu = tk.Menu(self.file_menu, tearoff=0)
         self.file_menu.add_cascade(label="Recent Files", menu=self.recent_menu)
         self._update_recent_files_menu()
-        
+
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Exit", command=parent.on_closing)
-        
+
         # Tools menu
         self.tools_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Tools", menu=self.tools_menu)

@@ -1,5 +1,5 @@
 """
-Módulo principal de la interfaz de usuario para la aplicación de análisis de placas.
+Main UI module for the plate analysis application.
 """
 import os
 import customtkinter as ctk
@@ -19,15 +19,15 @@ from src.utils.logger import setup_logging
 import tkinter as tk
 
 class PlateMaskApp(ctk.CTk):
-    """Clase principal de la aplicación de análisis de placas."""
+    """Main class for the plate analysis application."""
     
     def __init__(self, config, df):
         """
-        Inicializa la aplicación.
+        Initialize the application.
         
         Args:
-            config (Config): Objeto de configuración de la aplicación.
-            df (pandas.DataFrame, optional): DataFrame con los datos de las placas. Puede ser None.
+            config (Config): Application configuration object.
+            df (pandas.DataFrame, optional): DataFrame with plate data. Can be None.
         """
         super().__init__()
         self.title("Plate Masking Interface")
@@ -48,6 +48,7 @@ class PlateMaskApp(ctk.CTk):
         self.grid_sections = []
         self.buttons = []
         self.all_buttons = []
+        self.assays = []
         self.section_colors = ['#FF9999', '#99FF99', '#9999FF', '#FFFF99', '#FF99FF', '#99FFFF']
         
         # Archivos para guardar/cargar datos
@@ -105,6 +106,18 @@ class PlateMaskApp(ctk.CTk):
             
             # Ensure keys are valid strings
             self.keys = [str(k) for k in getattr(self.plate_data, 'keys', []) if k is not None]
+
+            # Get unique assays
+            if 'assay' in self.df.columns:
+                self.assays = sorted(self.df['assay'].unique().tolist())
+            else:
+                self.assays = []
+
+            # Update assay combobox if it exists
+            if hasattr(self, 'assay_combo'):
+                self.assay_combo.configure(values=self.assays)
+                if self.assays:
+                    self.assay_combo.set(self.assays[0])
             
             # Initialize section wells
             self.sections = []
@@ -332,23 +345,7 @@ class PlateMaskApp(ctk.CTk):
         )
         load_button.pack(pady=20)
         
-        # Add section editor button
-        section_btn = ctk.CTkButton(
-            welcome_frame,
-            text="Edit Sections",
-            command=self.menu.show_section_editor,
-            width=120
-        )
-        section_btn.pack(side=ctk.LEFT, padx=5, pady=5)
-        
-        # Add configuration button
-        config_btn = ctk.CTkButton(
-            welcome_frame,
-            text="Configuration",
-            command=self.menu.show_configuration,
-            width=120
-        )
-        config_btn.pack(side=ctk.LEFT, padx=5, pady=5)
+
         
         # Show recent files if available
         if self.config.recent_files:
@@ -405,110 +402,59 @@ class PlateMaskApp(ctk.CTk):
         self.top_frame = ctk.CTkFrame(self)
         self.top_frame.pack(pady=10, fill="x", padx=10)
         
-        # Etiqueta para el dropdown
+        # Label for the dropdown
         self.combo_label = ctk.CTkLabel(self.top_frame, text="Select Plate-Assay:")
         self.combo_label.pack(side="left", padx=(0, 10))
         
-        # Dropdown para seleccionar placa-ensayo
+        # Dropdown to select plate-assay
         self.combo = ctk.CTkComboBox(self.top_frame, values=self.keys, command=self.on_select, width=200)
         self.combo.pack(side="left", padx=10)
         
-        # Botón de modo avanzado
+        # Advanced mode button
         self.advanced_btn = ctk.CTkButton(self.top_frame, text="Advanced Mode", command=self.toggle_advanced_mode)
         self.advanced_btn.pack(side="right", padx=10)
 
     def _setup_content_frame(self):
-        """Configura el frame principal de contenido."""
-        self.content_frame = ctk.CTkFrame(self)
-        self.content_frame.pack(pady=10, fill="both", expand=True)
-        
-        # Contenedor para la cuadrícula con scrollbars
-        self.grid_container = ctk.CTkFrame(self.content_frame)
-        self.grid_container.pack(side="left", fill="both", expand=True)
-        
-        # Canvas con scrollbars para la cuadrícula
-        self.grid_canvas = tk.Canvas(self.grid_container, highlightthickness=0)
-        self.grid_scroll_y = ctk.CTkScrollbar(self.grid_container, orientation="vertical", command=self.grid_canvas.yview)
-        self.grid_scroll_x = ctk.CTkScrollbar(self.grid_container, orientation="horizontal", command=self.grid_canvas.xview)
-        self.grid_canvas.configure(yscrollcommand=self.grid_scroll_y.set, xscrollcommand=self.grid_scroll_x.set)
-        
-        # Posicionar elementos
-        self.grid_canvas.grid(row=0, column=0, sticky="nsew")
-        self.grid_scroll_y.grid(row=0, column=1, sticky="ns")
-        self.grid_scroll_x.grid(row=1, column=0, sticky="ew")
-        
-        # Configurar el grid para que el canvas se expanda
-        self.grid_container.grid_rowconfigure(0, weight=1)
-        self.grid_container.grid_columnconfigure(0, weight=1)
-        
-        # Frame para la cuadrícula de pocillos dentro del canvas
-        self.grid_frame = ctk.CTkFrame(self.grid_canvas)
-        self.grid_window = self.grid_canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
-        
-        # Configurar eventos
-        self.grid_frame.bind("<Configure>", self._on_grid_configure)
-        self.grid_canvas.bind("<Configure>", self._on_canvas_configure)
-        
-        # Frame para la leyenda de secciones (lado derecho)
+        """Set up the main content frame."""
+        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.content_frame.pack(pady=10, fill="both", expand=True, padx=10)
+
+        # Use CTkScrollableFrame for the grid area. This handles scrolling
+        # and theming correctly, removing the need for a separate canvas.
+        self.grid_frame = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
+        self.grid_frame.pack(side="left", fill="both", expand=True)
+
+        # Frame for the section legend (right side)
         self.legend_frame = ctk.CTkFrame(self.content_frame)
         self.legend_frame.pack(side="right", pady=10, padx=10, fill="y")
 
-    def _on_grid_configure(self, event=None):
-        # Ajustar el scrollregion del canvas cuando cambia el tamaño del frame
-        self.grid_canvas.configure(scrollregion=self.grid_canvas.bbox("all"))
-
-    def _on_canvas_configure(self, event=None):
-        # Ajustar el tamaño del frame al canvas
-        if event:
-            canvas_width = max(event.width, self.grid_frame.winfo_reqwidth())
-            self.grid_canvas.itemconfig(self.grid_window, width=canvas_width)
-            # Asegurarse de que el canvas se actualiza
-            self.grid_canvas.configure(scrollregion=self.grid_canvas.bbox("all"))
-
-
     def _setup_button_frame(self):
-        """Configura el frame de botones de control."""
+        """Set up the control buttons frame."""
         self.btn_frame = ctk.CTkFrame(self)
         self.btn_frame.pack(pady=10, fill="x", padx=10)
-        
-        # Botones de control
-        self.start_btn = ctk.CTkButton(self.btn_frame, text="Start Analysis", command=self.analyze_all)
-        self.start_btn.pack(side="left", padx=5)
-        
-        self.copy_ab_btn = ctk.CTkButton(self.btn_frame, text="Copiar selección a todas las placas AB", 
-                                        command=lambda: self.copy_to_assay('AB'))
-        self.copy_ab_btn.pack(side="left", padx=5)
-        
-        self.copy_ros_btn = ctk.CTkButton(self.btn_frame, text="Copiar selección a todas las placas ROS", 
-                                         command=lambda: self.copy_to_assay('ROS'))
-        self.copy_ros_btn.pack(side="left", padx=5)
+
+        # Dropdown and button for copying selection to a specific assay
+        self.copy_assay_label = ctk.CTkLabel(self.btn_frame, text="Copy selection to assay:")
+        self.copy_assay_label.pack(side="left", padx=(10, 2))
+
+        self.assay_combo = ctk.CTkComboBox(self.btn_frame, values=self.assays, width=120)
+        self.assay_combo.pack(side="left", padx=2)
+        if self.assays:
+            self.assay_combo.set(self.assays[0])
+
+        self.copy_assay_btn = ctk.CTkButton(self.btn_frame, text="Copy", command=self._copy_selection_to_selected_assay, width=60)
+        self.copy_assay_btn.pack(side="left", padx=(2, 5))
         
         # Botón para copiar a la misma placa
         self.copy_same_plate_btn = ctk.CTkButton(self.btn_frame, text="Copy to Same Plate", command=self.copy_to_same_plate)
         self.copy_same_plate_btn.pack(side="left", padx=5)
-        
+
         self.analyze_all_btn = ctk.CTkButton(self.btn_frame, text="Analyze this plate", command=self.analyze_this_plate)
         self.analyze_all_btn.pack(side="left", padx=5)
-        
-        # Botón para editar secciones
-        self.section_btn = ctk.CTkButton(
-            self.btn_frame, 
-            text="Edit Sections",
-            command=self._edit_sections,
-            fg_color="#4CAF50",
-            hover_color="#45a049"
-        )
-        self.section_btn.pack(side="left", padx=5)
-        
-        # Botón de configuración
-        self.config_btn = ctk.CTkButton(
-            self.btn_frame,
-            text="Configuration",
-            command=self.menu.show_configuration,
-            fg_color="#2196F3",
-            hover_color="#1976D2"
-        )
-        self.config_btn.pack(side="left", padx=5)
+
+        # Botones de control
+        self.start_btn = ctk.CTkButton(self.btn_frame, text="Start Analysis", command=self.analyze_all, fg_color="green", hover_color="dark green")
+        self.start_btn.pack(side="left", padx=5)
         
         # Disable buttons if no data is loaded
         if self.df is None:
@@ -517,15 +463,11 @@ class PlateMaskApp(ctk.CTk):
     def _set_buttons_state(self, state):
         """Set the state of all control buttons."""
         self.start_btn.configure(state=state)
-        self.copy_ab_btn.configure(state=state)
-        self.copy_ros_btn.configure(state=state)
+        self.assay_combo.configure(state=state)
+        self.copy_assay_btn.configure(state=state)
         self.copy_same_plate_btn.configure(state=state)
         self.analyze_all_btn.configure(state=state)
-        
-        # Enable/disable section and config buttons based on data availability
-        data_loaded = state != tk.DISABLED
-        self.section_btn.configure(state=state)
-        self.config_btn.configure(state=tk.NORMAL)  # Always enable config button
+
 
     def _setup_options_frame(self):
         """Configura el frame de opciones con checkboxes."""
@@ -861,6 +803,12 @@ class PlateMaskApp(ctk.CTk):
         
         # Update the configuration
         self.config.update_neg_ctrl_masks(self.selected_key, self.neg_ctrl_mask_map[self.selected_key])
+
+    def _copy_selection_to_selected_assay(self):
+        """Copies the current mask to all plates with the selected assay."""
+        selected_assay = self.assay_combo.get()
+        if selected_assay:
+            self.copy_to_assay(selected_assay)
 
     def copy_to_same_plate(self):
         """Copia la máscara actual a todos los puntos de tiempo de la misma placa."""

@@ -4,26 +4,26 @@ Módulo para la visualización de la cuadrícula de placas.
 import customtkinter as ctk
 
 class PlateGridView:
-    """Clase para mostrar la cuadrícula de pocillos de una placa."""
+    """Class to display the well grid of a plate."""
     
     def __init__(self, parent, plate, assay, mask, neg_ctrl_mask, sections, section_colors, 
                 toggle_well_callback, toggle_negative_control_callback, advanced_mode=False, 
                 current_individual_plate=None):
         """
-        Inicializa la vista de cuadrícula.
+        Initialize the grid view.
         
         Args:
-            parent: Widget padre donde se mostrará la cuadrícula.
-            plate (str): Número de placa.
-            assay (str): Tipo de ensayo.
-            mask (numpy.ndarray): Máscara de pocillos (8x12).
-            neg_ctrl_mask (numpy.ndarray): Máscara de controles negativos (8x12).
-            sections (list): Lista de tuplas con los límites de cada sección.
-            section_colors (list): Lista de colores para cada sección.
-            toggle_well_callback (callable): Función para alternar el estado de un pocillo.
-            toggle_negative_control_callback (callable): Función para alternar el estado de control negativo.
-            advanced_mode (bool, optional): Si está en modo avanzado. Por defecto False.
-            current_individual_plate (pandas.Series, optional): Datos de la placa individual seleccionada.
+            parent: Parent widget where the grid will be displayed.
+            plate (str): Plate number.
+            assay (str): Assay type.
+            mask (numpy.ndarray): Well mask (8x12).
+            neg_ctrl_mask (numpy.ndarray): Negative control mask (8x12).
+            sections (list): List of tuples with the limits of each section.
+            section_colors (list): List of colors for each section.
+            toggle_well_callback (callable): Function to toggle the state of a well.
+            toggle_negative_control_callback (callable): Function to toggle the state of a negative control.
+            advanced_mode (bool, optional): Whether it is in advanced mode. Defaults to False.
+            current_individual_plate (pandas.Series, optional): Data of the selected individual plate.
         """
         self.parent = parent
         self.plate = plate
@@ -43,42 +43,42 @@ class PlateGridView:
         self._create_grid()
     
     def _create_grid(self):
-        """Crea la cuadrícula de pocillos."""
-        # Si en modo avanzado y una placa individual está seleccionada, usar esos datos
+        """Create the well grid."""
+        # If in advanced mode and an individual plate is selected, use that data
         if self.advanced_mode and self.current_individual_plate is not None:
-            # Mostrar la placa individual
+            # Show the individual plate
             hours = self.current_individual_plate['hours']
             plate_label = ctk.CTkLabel(self.parent, 
                                       text=f"Viewing: {self.plate}_{self.assay} at {hours} hours",
                                       font=("Arial", 14, "bold"))
             plate_label.grid(row=0, column=0, columnspan=13, pady=(0, 10))
             
-            # Ajustar fila inicial para la cuadrícula
+            # Set initial row for the grid
             start_row = 1
         else:
-            # Modo regular - solo mostrar la placa-ensayo
+            # Regular mode - just show the plate-assay
             plate_label = ctk.CTkLabel(self.parent, 
                                       text=f"Viewing: {self.plate}_{self.assay}",
                                       font=("Arial", 14, "bold"))
             plate_label.grid(row=0, column=0, columnspan=13, pady=(0, 10))
             start_row = 1
 
-        # Añadir encabezados de columna (1-12)
+        # Add column headers (1-12)
         for j in range(12):
             col_label = ctk.CTkLabel(self.parent, text=f"{j+1}")
             col_label.grid(row=start_row, column=j+1, padx=2, pady=2)
             
-        # Crear frames de sección primero
+        # Create section frames first
         section_frames = []
         for i, (r1, c1, r2, c2) in enumerate(self.sections):
-            # Crear un frame para esta sección con un borde coloreado
+            # Create a frame for this section with a colored border
             section_frame = ctk.CTkFrame(self.parent, fg_color="transparent", 
                                         border_color=self.section_colors[i], border_width=2)
-            # Posicionar el frame para cubrir los pocillos en esta sección
+            # Position the frame to cover the wells in this section
             section_frame.grid(row=r1+start_row+1, column=c1+1, rowspan=r2-r1+1, 
                               columnspan=c2-c1+1, padx=2, pady=2, sticky="nsew")
             
-            # Añadir una etiqueta para la sección
+            # Add a label for the section
             section_label = ctk.CTkLabel(section_frame, text=f"S{i+1}", 
                                         fg_color=self.section_colors[i],
                                         text_color="black", corner_radius=5)
@@ -86,7 +86,7 @@ class PlateGridView:
             
             section_frames.append(section_frame)
         
-        # Añadir encabezados de fila (A-H) y botones
+        # Add row headers (A-H) and buttons
         for i in range(8):  # filas A-H
             row_btns = []
             # Encabezado de fila

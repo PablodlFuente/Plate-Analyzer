@@ -7,23 +7,22 @@ import re
 
 def parse_spectro_excel(file_path):
     """
-    Parse a spectrophotometry plate data Excel file.
-    
+    Analyzes a spectrophotometer Excel file and extracts plate data.
+
     Args:
         file_path (str): Path to the Excel file.
-        
+
     Returns:
-        pandas.DataFrame: DataFrame with the parsed data.
+        pandas.DataFrame: A DataFrame with the plate data.
     """
     raw = pd.read_excel(file_path, header=None)
     records = []
     nrows = raw.shape[0]
     i = 0
-    
     # Regex patterns for plate number, assay, time and unit
     pat_plate = re.compile(r'(P\d+)', re.IGNORECASE)
     pat_assay = re.compile(r'(?:(?<=_)|^)(AB|ROS)(?:(?=_)|$)', re.IGNORECASE)
-    pat_hours = re.compile(r'(\d+(?:\.\d+)?)(?=[hm])', re.IGNORECASE)
+    pat_hours = re.compile(r'(\d+)(?=[hm])', re.IGNORECASE)
     pat_unit = re.compile(r'([hm])', re.IGNORECASE)
 
     while i < nrows:
@@ -35,12 +34,12 @@ def parse_spectro_excel(file_path):
             m_hours = pat_hours.search(plate_full)
             m_unit = pat_unit.search(plate_full)
 
-            # Extract or use default values
+            # Extract or default to NaN
             plate_no = m_plate.group(1).upper() if m_plate else np.nan
-            assay = m_assay.group(1).upper() if m_assay else 'NaN'  # Default to 'NaN' for invalid assays
+            assay = m_assay.group(1).upper() if m_assay else np.nan
             if m_hours:
-                val = float(m_hours.group(1))  # Convert to float to handle decimal hours
-                hours = val / 60.0 if m_unit and m_unit.group(1).lower() == 'm' else val
+                val = int(m_hours.group(1))
+                hours = val / 60.0 if m_unit and m_unit.group(1).lower() == 'm' else float(val)
             else:
                 hours = np.nan
 
@@ -55,13 +54,12 @@ def parse_spectro_excel(file_path):
 
             # Only keep complete plates
             if len(data_list) == 96:
-                # Convert to list to ensure JSON serialization
-                data_arr = np.array(data_list, dtype=float).reshape(8, 12).tolist()
+                data_arr = np.array(data_list, dtype=float).reshape(8, 12)
                 records.append({
-                    'plate_no': str(plate_no),  # Ensure plate_no is a string
-                    'assay': str(assay),        # Ensure assay is a string
-                    'hours': float(hours),      # Ensure hours is a float
-                    'data': data_arr            # This is now a list of lists
+                    'plate_no': plate_no,
+                    'assay': assay,
+                    'hours': hours,
+                    'data': data_arr
                 })
             i = j + 1
         else:

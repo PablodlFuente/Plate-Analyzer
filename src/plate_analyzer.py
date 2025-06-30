@@ -9,60 +9,12 @@ import webbrowser
 import tempfile
 import json
 import csv
+import logging
+from src import utils as utils_old
+from src.utils import file_operations as utils
 
 # Parser function to extract plate data from an Excel file
-def parse_spectro_excel(file_path):
-    raw = pd.read_excel(file_path, header=None)
-    records = []
-    nrows = raw.shape[0]
-    i = 0
-    # Regex patterns for plate number, assay, time and unit
-    pat_plate = re.compile(r'(P\d+)', re.IGNORECASE)
-    pat_assay = re.compile(r'(?:(?<=_)|^)(AB|ROS)(?:(?=_)|$)', re.IGNORECASE)
-    pat_hours = re.compile(r'(\d+)(?=[hm])', re.IGNORECASE)
-    pat_unit = re.compile(r'([hm])', re.IGNORECASE)
 
-    while i < nrows:
-        cell = str(raw.iat[i, 0]).strip()
-        if cell.startswith("Plate"):  # Start of a plate block
-            plate_full = str(raw.iat[i, 1]).strip()
-            m_plate = pat_plate.search(plate_full)
-            m_assay = pat_assay.search(plate_full)
-            m_hours = pat_hours.search(plate_full)
-            m_unit = pat_unit.search(plate_full)
-
-            # Extract or default to NaN
-            plate_no = m_plate.group(1).upper() if m_plate else np.nan
-            assay = m_assay.group(1).upper() if m_assay else np.nan
-            if m_hours:
-                val = int(m_hours.group(1))
-                hours = val / 60.0 if m_unit and m_unit.group(1).lower() == 'm' else float(val)
-            else:
-                hours = np.nan
-
-            data_list = []
-            j = i + 2  # Skip header rows
-            # Read until ~End marker
-            while j < nrows and str(raw.iat[j, 0]).strip() != "~End":
-                row = raw.iloc[j, 2:14].astype(float)
-                if not row.isna().all():
-                    data_list.extend(row.tolist())
-                j += 1
-
-            # Only keep complete plates
-            if len(data_list) == 96:
-                data_arr = np.array(data_list, dtype=float).reshape(8, 12)
-                records.append({
-                    'plate_no': plate_no,
-                    'assay': assay,
-                    'hours': hours,
-                    'data': data_arr
-                })
-            i = j + 1
-        else:
-            i += 1
-
-    return pd.DataFrame(records)
 
 # GUI application class for interacting with plate data
 class PlateMaskApp(ctk.CTk):
@@ -70,7 +22,7 @@ class PlateMaskApp(ctk.CTk):
         super().__init__()
         self.title("Plate Masking Interface")
         self.geometry("900x800")
-        ctk.set_appearance_mode("system")
+        ctk.set_appearance_mode("dark")
 
         # Prepare data and mask structures
         self.df = df.copy().reset_index(drop=True)
@@ -87,7 +39,7 @@ class PlateMaskApp(ctk.CTk):
         self.section_grays = {key: [0, 0, 0, 0, 0, 0] for key in self.keys}
         # Try to load gray values from CSV if it exists
         self.gray_file = "section_grays.csv"
-        self.load_grays_from_csv()
+        utils.load_grays_from_csv(self.gray_file, self.section_grays)
         
         # Define section colors - using more vibrant colors for better visibility
         self.section_colors = ['#FF9999', '#99FF99', '#9999FF', '#FFFF99', '#FF99FF', '#99FFFF']
@@ -105,8 +57,8 @@ class PlateMaskApp(ctk.CTk):
         # Try to load masks from CSV if it exists
         self.mask_file = "last_masks.csv"
         self.neg_ctrl_mask_file = "last_neg_ctrl_masks.csv"
-        self.load_masks_from_csv()
-        self.load_neg_ctrl_masks_from_csv()
+        utils.load_masks_from_csv(self.mask_file, self.mask_map)
+        utils.load_neg_ctrl_masks_from_csv(self.neg_ctrl_mask_file, self.neg_ctrl_mask_map)
 
         # Create a frame for the top controls
         self.top_frame = ctk.CTkFrame(self)
@@ -148,15 +100,15 @@ class PlateMaskApp(ctk.CTk):
         # Control buttons
         self.start_btn = ctk.CTkButton(self.btn_frame, text="Start Analysis", command=self.on_start)
         self.start_btn.pack(side="left", padx=5)
-        self.copy_ab_btn = ctk.CTkButton(self.btn_frame, text="Copiar selección a todas las placas AB", command=lambda: self.copy_to_assay('AB'))
+        self.copy_ab_btn = ctk.CTkButton(self.btn_frame, text="Copy selection to all AB plates", command=lambda: self.copy_to_assay('AB'))
         self.copy_ab_btn.pack(side="left", padx=5)
-        self.copy_ros_btn = ctk.CTkButton(self.btn_frame, text="Copiar selección a todas las placas ROS", command=lambda: self.copy_to_assay('ROS'))
+        self.copy_ros_btn = ctk.CTkButton(self.btn_frame, text="Copy selection to all ROS plates", command=lambda: self.copy_to_assay('ROS'))
         self.copy_ros_btn.pack(side="left", padx=5)
         # New button: copy to same plate
-        self.copy_same_plate_btn = ctk.CTkButton(self.btn_frame, text="Copiar selección para la misma placa", command=self.copy_to_same_plate)
+        self.copy_same_plate_btn = ctk.CTkButton(self.btn_frame, text="Copy selection for the same plate", command=self.copy_to_same_plate)
         self.copy_same_plate_btn.pack(side="left", padx=5)
         # Analyze all button
-        self.analyze_all_btn = ctk.CTkButton(self.btn_frame, text="Analizar todo", command=self.analyze_all)
+        self.analyze_all_btn = ctk.CTkButton(self.btn_frame, text="Analyze all", command=self.analyze_all)
         self.analyze_all_btn.pack(side="left", padx=5)
         
         # Options frame for checkboxes
@@ -1589,232 +1541,17 @@ class PlateMaskApp(ctk.CTk):
             self.build_grid()
         
         # Save masks to CSV after copying
-        self.save_masks_to_csv()
-        self.save_neg_ctrl_masks_to_csv()
+        utils.save_masks_to_csv(self.mask_file, self.mask_map)
+        utils.save_neg_ctrl_masks_to_csv(self.neg_ctrl_mask_file, self.neg_ctrl_mask_map)
 
-    def save_masks_to_csv(self):
-        """Save all masks to a CSV file"""
-        try:
-            with open(self.mask_file, 'w', newline='') as f:
-                writer = csv.writer(f)
-                # Write header
-                writer.writerow(['plate_assay', 'row', 'col', 'value'])
-                
-                # Write each mask
-                for key, mask in self.mask_map.items():
-                    for i in range(8):
-                        for j in range(12):
-                            writer.writerow([key, i, j, mask[i, j]])
-            
-            import logging
-logging.getLogger('plate_analyzer').info(f"Masks saved to {self.mask_file}")
-        except Exception as e:
-            import logging
-logging.getLogger('plate_analyzer').error(f"Error saving masks: {e}")
 
-    def save_neg_ctrl_masks_to_csv(self):
-        """Save all negative control masks to a CSV file"""
-        try:
-            with open(self.neg_ctrl_mask_file, 'w', newline='') as f:
-                writer = csv.writer(f)
-                # Write header
-                writer.writerow(['plate_assay', 'row', 'col', 'value'])
-                
-                # Write each mask
-                for key, mask in self.neg_ctrl_mask_map.items():
-                    for i in range(8):
-                        for j in range(12):
-                            writer.writerow([key, i, j, mask[i, j]])
-            
-            import logging
-logging.getLogger('plate_analyzer').info(f"Negative control masks saved to {self.neg_ctrl_mask_file}")
-        except Exception as e:
-            import logging
-logging.getLogger('plate_analyzer').error(f"Error saving negative control masks: {e}")
-
-    def load_masks_from_csv(self):
-        """Load masks from CSV if the file exists"""
-        if not os.path.exists(self.mask_file):
-            import logging
-logging.getLogger('plate_analyzer').info(f"Mask file {self.mask_file} not found. Using default masks.")
-            return
-            
-        try:
-            # Read the CSV file
-            df = pd.read_csv(self.mask_file)
-            
-            # Group by plate_assay
-            for key, group in df.groupby('plate_assay'):
-                # Skip if key is not in our current keys
-                if key not in self.mask_map:
-                    continue
-                    
-                # Initialize a new mask
-                mask = np.ones((8, 12), dtype=float)
-                
-                # Fill in the mask values
-                for _, row in group.iterrows():
-                    i, j = int(row['row']), int(row['col'])
-                    mask[i, j] = row['value']
-                
-                # Update the mask map
-                self.mask_map[key] = mask
-                
-            import logging
-logging.getLogger('plate_analyzer').info(f"Masks loaded from {self.mask_file}")
-        except Exception as e:
-            import logging
-logging.getLogger('plate_analyzer').error(f"Error loading masks: {e}")
-
-    def load_neg_ctrl_masks_from_csv(self):
-        """Load negative control masks from CSV if the file exists"""
-        if not os.path.exists(self.neg_ctrl_mask_file):
-            import logging
-logging.getLogger('plate_analyzer').info(f"Negative control mask file {self.neg_ctrl_mask_file} not found. Using default masks.")
-            return
-            
-        try:
-            # Read the CSV file
-            df = pd.read_csv(self.neg_ctrl_mask_file)
-            
-            # Group by plate_assay
-            for key, group in df.groupby('plate_assay'):
-                # Skip if key is not in our current keys
-                if key not in self.neg_ctrl_mask_map:
-                    continue
-                    
-                # Initialize a new mask
-                mask = np.zeros((8, 12), dtype=float)
-                
-                # Fill in the mask values
-                for _, row in group.iterrows():
-                    i, j = int(row['row']), int(row['col'])
-                    mask[i, j] = row['value']
-                
-                # Update the mask map
-                self.neg_ctrl_mask_map[key] = mask
-                
-            import logging
-logging.getLogger('plate_analyzer').info(f"Negative control masks loaded from {self.neg_ctrl_mask_file}")
-        except Exception as e:
-            import logging
-logging.getLogger('plate_analyzer').error(f"Error loading negative control masks: {e}")
-
-    def save_section_grays(self):
-        """Save the current gray values for the selected plate-assay"""
-        try:
-            # Get values from entries
-            gray_values = []
-            for entry in self.gray_entries:
-                try:
-                    value = float(entry.get())
-                except ValueError:
-                    value = 0
-                gray_values.append(value)
-            
-            # Update the gray values for the current plate-assay
-            self.section_grays[self.selected_key] = gray_values
-            
-            # Save to CSV
-            self.save_grays_to_csv()
-            
-            # Show confirmation
-            self.result_box.delete('1.0', ctk.END)
-            self.result_box.insert(ctk.END, f"Gray values saved for {self.selected_key}\n")
-            for i, value in enumerate(gray_values):
-                self.result_box.insert(ctk.END, f"Section {i+1}: {value} Grays\n")
-        except Exception as e:
-            self.result_box.delete('1.0', ctk.END)
-            self.result_box.insert(ctk.END, f"Error saving gray values: {e}\n")
-
-    def copy_grays_to_all_plates(self):
-        """Copy the current gray values to all plates"""
-        try:
-            # Get values from entries
-            gray_values = []
-            for entry in self.gray_entries:
-                try:
-                    value = float(entry.get())
-                except ValueError:
-                    value = 0
-                gray_values.append(value)
-            
-            # Update all plates with these values
-            for key in self.keys:
-                self.section_grays[key] = gray_values.copy()
-            
-            # Save to CSV
-            self.save_grays_to_csv()
-            
-            # Show confirmation
-            self.result_box.delete('1.0', ctk.END)
-            self.result_box.insert(ctk.END, "Gray values copied to all plates\n")
-            for i, value in enumerate(gray_values):
-                self.result_box.insert(ctk.END, f"Section {i+1}: {value} Grays\n")
-        except Exception as e:
-            self.result_box.delete('1.0', ctk.END)
-            self.result_box.insert(ctk.END, f"Error copying gray values: {e}\n")
-
-    def save_grays_to_csv(self):
-        """Save all gray values to a CSV file"""
-        try:
-            with open(self.gray_file, 'w', newline='') as f:
-                writer = csv.writer(f)
-                # Write header
-                writer.writerow(['plate_assay', 'section', 'gray_value'])
-            
-                # Write each gray value
-                for key, values in self.section_grays.items():
-                    for i, value in enumerate(values):
-                        writer.writerow([key, i+1, value])
-        
-            import logging
-logging.getLogger('plate_analyzer').info(f"Gray values saved to {self.gray_file}")
-        except Exception as e:
-            import logging
-logging.getLogger('plate_analyzer').error(f"Error saving gray values: {e}")
-
-    def load_grays_from_csv(self):
-        """Load gray values from CSV if the file exists"""
-        if not os.path.exists(self.gray_file):
-            import logging
-logging.getLogger('plate_analyzer').info(f"Gray file {self.gray_file} not found. Using default values.")
-            return
-        
-        try:
-            # Read the CSV file
-            df = pd.read_csv(self.gray_file)
-        
-            # Group by plate_assay
-            for key, group in df.groupby('plate_assay'):
-                # Skip if key is not in our current keys
-                if key not in self.section_grays:
-                    continue
-                
-                # Initialize a new array for gray values
-                gray_values = [0, 0, 0, 0, 0, 0]
-            
-                # Fill in the gray values
-                for _, row in group.iterrows():
-                    section = int(row['section'])
-                    if 1 <= section <= 6:
-                        gray_values[section-1] = float(row['gray_value'])
-            
-                # Update the gray values
-                self.section_grays[key] = gray_values
-            
-            import logging
-logging.getLogger('plate_analyzer').info(f"Gray values loaded from {self.gray_file}")
-        except Exception as e:
-            import logging
-logging.getLogger('plate_analyzer').error(f"Error loading gray values: {e}")
 
     def on_closing(self):
         """Handle window closing event"""
         # Save masks to CSV
-        self.save_masks_to_csv()
-        self.save_neg_ctrl_masks_to_csv()
+        utils.save_masks_to_csv(self.mask_file, self.mask_map)
+        utils.save_neg_ctrl_masks_to_csv(self.neg_ctrl_mask_file, self.neg_ctrl_mask_map)
         # Save gray values to CSV
-        self.save_grays_to_csv()
+        utils.save_grays_to_csv(self.gray_file, self.section_grays)
         # Destroy the window
         self.destroy()

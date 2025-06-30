@@ -7,13 +7,13 @@ import re
 
 def parse_spectro_excel(file_path):
     """
-    Analiza un archivo Excel con datos de espectrofotometría de placas.
-    
+    Parses an Excel file with plate spectrophotometry data.
+
     Args:
-        file_path (str): Ruta al archivo Excel.
-        
+        file_path (str): Path to the Excel file.
+    
     Returns:
-        pandas.DataFrame: DataFrame con los datos analizados.
+        pandas.DataFrame: DataFrame with the parsed data.
     """
     raw = pd.read_excel(file_path, header=None)
     records = []
