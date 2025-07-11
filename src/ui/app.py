@@ -16,6 +16,7 @@ from utils import save_grays_to_csv, load_grays_from_csv
 from src.modules.config import Config
 from src.ui.menu import AppMenu
 from src.utils.logger import setup_logging
+import os
 import tkinter as tk
 
 class PlateMaskApp(ctk.CTk):
@@ -51,10 +52,14 @@ class PlateMaskApp(ctk.CTk):
         self.assays = []
         self.section_colors = ['#FF9999', '#99FF99', '#9999FF', '#FFFF99', '#FF99FF', '#99FFFF']
         
+        # Create tmp directory if it doesn't exist
+        if not os.path.exists("tmp"):
+            os.makedirs("tmp")
+
         # Archivos para guardar/cargar datos
-        self.mask_file = "last_masks.csv"
-        self.neg_ctrl_mask_file = "last_neg_ctrl_masks.csv"
-        self.gray_file = "section_grays.csv"
+        self.mask_file = os.path.join("tmp", "last_masks.csv")
+        self.neg_ctrl_mask_file = os.path.join("tmp", "last_neg_ctrl_masks.csv")
+        self.gray_file = os.path.join("tmp", "section_grays.csv")
         
         # Initialize data if provided
         if df is not None:

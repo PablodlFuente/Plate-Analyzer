@@ -12,7 +12,7 @@ class Config:
     
     def __init__(self):
         """Initialize configuration with default values."""
-        config_dir = user_config_dir("PlateAnalyzer", "YourCompany") # Replace 'YourCompany' with actual company name or leave as is
+        config_dir = user_config_dir("PlateAnalyzer", "CMAM") 
         os.makedirs(config_dir, exist_ok=True)
         self.config_file = os.path.join(config_dir, "plates_analyzer_config.json")
         self.masks = {}
