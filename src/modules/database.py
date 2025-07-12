@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np  # Added to safely convert numpy scalars to Python types
 
-DB_FILE = "plate_data.db"
+DB_FILE = "data/plate_data.db"
 
 def get_db_connection():
     """Establishes a connection to the SQLite database."""
