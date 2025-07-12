@@ -6,6 +6,7 @@ import sqlite3
 import logging
 from datetime import datetime
 import pandas as pd
+import numpy as np  # Added to safely convert numpy scalars to Python types
 
 DB_FILE = "plate_data.db"
 
@@ -46,6 +47,13 @@ def create_table():
         logging.getLogger('plate_analyzer').error(f"Database error while creating table: {e}")
         raise
 
+def _to_py(value):
+    """Convert numpy scalar types to native Python scalars to avoid
+    inserting BLOBs into SQLite or failing to match during queries."""
+    if isinstance(value, (np.generic,)):
+        return value.item()
+    return value
+
 def find_conflicts(data_df):
     """Find rows in the DataFrame that conflict with existing DB records.
     Returns tuple: (non_conflicts_df, incoming_conflicts_df, existing_conflicts_df).
@@ -64,7 +72,15 @@ def find_conflicts(data_df):
         # Check for each row individually for maximum robustness
         for index, row in data_df.iterrows():
             query = "SELECT * FROM plate_readings WHERE date=? AND hour=? AND plate=? AND x=? AND y=? AND assay=?"
-            params = (row['date'], row['hour'], row['plate'], row['x'], row['y'], row['assay'])
+            # Ensure numeric params are native Python scalars (not numpy types)
+            params = (
+                row['date'],
+                _to_py(row['hour']),
+                row['plate'],
+                _to_py(row['x']),
+                _to_py(row['y']),
+                row['assay']
+            )
             cursor.execute(query, params)
             match = cursor.fetchone()
             if match:
@@ -93,6 +109,8 @@ def insert_records(data_df):
     if data_df.empty:
         return
 
+        # Convert numpy scalar types to native Python types for SQLite compatibility
+    data_df = data_df.applymap(_to_py)
     data_df['update_datetime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     with get_db_connection() as conn:
@@ -100,20 +118,25 @@ def insert_records(data_df):
         placeholders = ', '.join(['?'] * len(cols))
         sql = f"INSERT OR REPLACE INTO plate_readings ({', '.join(cols)}) VALUES ({placeholders})"
         cursor = conn.cursor()
-        cursor.executemany(sql, data_df.to_records(index=False))
+        records = [tuple(row) for row in data_df.to_numpy()]
+        cursor.executemany(sql, records)
         conn.commit()
 
 def replace_records(data_df):
     """Inserts new records or replaces them if they already exist."""
     if data_df.empty:
         return
+        # Convert numpy scalar types to native Python types for SQLite compatibility
+    data_df = data_df.applymap(_to_py)
+    data_df['update_datetime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     with get_db_connection() as conn:
-        data_df['update_datetime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cols = ', '.join(data_df.columns)
         placeholders = ', '.join(['?'] * len(data_df.columns))
         sql = f'INSERT OR REPLACE INTO plate_readings ({cols}) VALUES ({placeholders})'
         cursor = conn.cursor()
-        cursor.executemany(sql, data_df.to_records(index=False))
+        records = [tuple(row) for row in data_df.to_numpy()]
+        cursor.executemany(sql, records)
         conn.commit()
 
 def delete_all_records():
