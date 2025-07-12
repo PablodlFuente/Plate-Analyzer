@@ -2,7 +2,8 @@
 Configuration dialog for the Plates Analyzer application.
 """
 import customtkinter as ctk
-from tkinter import ttk
+from src.modules import database as db
+from tkinter import ttk, messagebox
 
 class ConfigurationDialog(ctk.CTkToplevel):
     """Dialog for application configuration."""
@@ -17,8 +18,8 @@ class ConfigurationDialog(ctk.CTkToplevel):
         """
         super().__init__(parent)
         self.title("Configuration")
-        self.geometry("400x300")
-        self.resizable(False, False)
+        self.geometry("400x600")
+        self.resizable(False, True)
         
         self.config = config
         self.on_config_saved = on_config_saved
@@ -77,6 +78,20 @@ class ConfigurationDialog(ctk.CTkToplevel):
             width=200
         )
         log_level_combo.pack(pady=5, anchor="w")
+
+        # Separator
+        sep = ctk.CTkLabel(self.main_frame, text="", height=2)
+        sep.pack(fill="x", pady=10)
+
+        # Delete all database button
+        delete_btn = ctk.CTkButton(
+            self.main_frame,
+            text="Delete ALL Database Records",
+            fg_color="red",
+            hover_color="#aa0000",
+            command=self._on_delete_db
+        )
+        delete_btn.pack(pady=10, anchor="center")
         
 
         
@@ -86,6 +101,15 @@ class ConfigurationDialog(ctk.CTkToplevel):
 
         # Bind the closing event
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_delete_db(self):
+        """Prompt confirmation and delete all records from the database."""
+        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete ALL records from the database? This action cannot be undone."):
+            try:
+                db.delete_all_records()
+                messagebox.showinfo("Success", "All records have been deleted from the database.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete records: {e}")
 
     def _on_close(self):
         """Handle save button click."""

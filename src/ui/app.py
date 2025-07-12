@@ -18,6 +18,11 @@ from src.ui.menu import AppMenu
 from src.utils.logger import setup_logging
 import os
 import tkinter as tk
+from src.modules.database import find_conflicts, insert_records, replace_records, detect_internal_duplicates
+from src.ui.conflict_dialog import ConflictDialog
+import logging
+import re
+from datetime import datetime
 
 class PlateMaskApp(ctk.CTk):
     """Main class for the plate analysis application."""
@@ -456,6 +461,9 @@ class PlateMaskApp(ctk.CTk):
 
         self.analyze_all_btn = ctk.CTkButton(self.btn_frame, text="Analyze this plate", command=self.analyze_this_plate)
         self.analyze_all_btn.pack(side="left", padx=5)
+
+        self.save_db_btn = ctk.CTkButton(self.btn_frame, text="Save to DB", command=self.save_to_db_action)
+        self.save_db_btn.pack(side="left", padx=5)
 
         # Botones de control
         self.start_btn = ctk.CTkButton(self.btn_frame, text="Start Analysis", command=self.analyze_all, fg_color="green", hover_color="dark green")
@@ -1036,8 +1044,9 @@ class PlateMaskApp(ctk.CTk):
                 self.result_box.insert(ctk.END, f"Error: No data found in file {file_path}\n")
                 return
                 
-            # Store the new DataFrame
+            # Store the new DataFrame and file path
             self.df = df
+            self.current_file_path = file_path
             
             # Reinitialize the data
             self._initialize_data(df)
@@ -1101,3 +1110,112 @@ class PlateMaskApp(ctk.CTk):
         # Show in result box
         self.result_box.delete('1.0', ctk.END)
         self.result_box.insert(tk.END, result_text)
+
+    def save_to_db_action(self):
+        """Prepare current data and save it to the SQLite DB, resolving duplicates and conflicts through dialogs."""
+        if self.df is None or not hasattr(self, 'current_file_path'):
+            self.result_box.delete('1.0', ctk.END)
+            self.result_box.insert(ctk.END, "Please load a data file first.")
+            return
+
+        try:
+            self.result_box.delete('1.0', ctk.END)
+            self.result_box.insert(ctk.END, "Preparing data for database...\n")
+            self.update_idletasks()
+
+            # --- 1. Extract date from file name or modification time ---
+            file_name = os.path.basename(self.current_file_path)
+            match = re.search(r'(\d{8})', file_name)
+            if match:
+                file_date = datetime.strptime(match.group(1), '%Y%m%d').strftime('%Y-%m-%d')
+            else:
+                mod_time = os.path.getmtime(self.current_file_path)
+                file_date = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d')
+
+            # --- 2. Build records list ---
+            records = []
+            well_to_section = {well: i for i, section in enumerate(self.section_wells) for well in section}
+
+            for key in self.keys:
+                plate_no, assay = key.split('_')
+                mask = self.mask_map.get(key, np.ones((8, 12)))
+                neg_ctrl_mask = self.neg_ctrl_mask_map.get(key, np.zeros((8, 12)))
+                section_doses = self.section_grays.get(key, [0] * len(self.section_wells))
+
+                plate_rows = self.df[(self.df['plate_no'] == plate_no) & (self.df['assay'] == assay)]
+                for _, row in plate_rows.iterrows():
+                    hour = row['hours']
+                    plate_values = row['data']
+                    for i in range(8):      # row index
+                        for j in range(12): # col index
+                            if mask[i, j] != 1:
+                                continue
+                            well_name = f"{chr(ord('A') + i)}{j + 1}"
+                            is_neg_control = int(neg_ctrl_mask[i, j] == 1)
+                            section_index = well_to_section.get((i, j), -1)
+                            dose = section_doses[section_index] if section_index != -1 else 0
+                            records.append({
+                                'file_path': self.current_file_path,
+                                'date': file_date,
+                                'hour': hour,
+                                'plate': plate_no,
+                                'well_name': well_name,
+                                'x': j,
+                                'y': i,
+                                'assay': assay,
+                                'theo_dose': dose,
+                                'real_dose': dose,
+                                'value': plate_values[i][j],
+                                'is_neg_control': is_neg_control
+                            })
+
+            if not records:
+                self.result_box.insert(ctk.END, "No data to save after applying masks.")
+                return
+
+            # --- 3. DataFrame of incoming data ---
+            db_df = pd.DataFrame(records)
+            self.result_box.insert(ctk.END, "Data to be saved (preview):\n")
+            self.result_box.insert(ctk.END, db_df.head().to_string(index=False) + "\n\n")
+
+            # --- 4. Pre-process and remove internal duplicates before any conflict detection ---
+            db_df = db_df.drop_duplicates(subset=['date', 'hour', 'plate', 'x', 'y', 'assay'], keep='last')
+
+            # --- 5. Detect conflicts against DB ---
+            non_conflicting_df, incoming_conflicts_df, db_conflicts_df = find_conflicts(db_df)
+
+            if incoming_conflicts_df.empty:
+                # Simple path – just insert
+                insert_records(non_conflicting_df)
+                self.result_box.insert(
+                    ctk.END,
+                    f"Successfully saved {len(non_conflicting_df)} new records to the database.\n"
+                )
+            else:
+                # Show conflicts dialog (side-by-side)
+                import logging
+                logging.getLogger('plate_analyzer').info('DB Conflicts DF (from DB):\n' + db_conflicts_df.to_string())
+                logging.getLogger('plate_analyzer').info('Incoming Conflicts DF (from file):\n' + incoming_conflicts_df.to_string())
+                conflict_dialog = ConflictDialog(self, db_conflicts_df, incoming_conflicts_df)
+                user_choice = conflict_dialog.result
+                if user_choice == 'replace':
+                    insert_records(non_conflicting_df)
+                    replace_records(incoming_conflicts_df)
+                    self.result_box.insert(
+                        ctk.END,
+                        f"Replaced {len(incoming_conflicts_df)} conflicting records and saved {len(non_conflicting_df)} new ones.\n"
+                    )
+                elif user_choice == 'ignore':
+                    insert_records(non_conflicting_df)
+                    self.result_box.insert(
+                        ctk.END,
+                        f"Ignored {len(incoming_conflicts_df)} conflicting records. Saved {len(non_conflicting_df)} new records.\n"
+                    )
+                else:
+                    self.result_box.insert(ctk.END, "Save cancelled.\n")
+
+        except Exception as e:
+            import traceback
+            logging.getLogger('plate_analyzer').error(f"Error in save_to_db_action: {e}")
+            self.result_box.insert(ctk.END, f"An error occurred: {e}\n")
+            self.result_box.insert(ctk.END, traceback.format_exc())
