@@ -21,10 +21,9 @@ def create_table():
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            # Drop the table to ensure schema changes are applied
-            cursor.execute("DROP TABLE IF EXISTS plate_readings")
+
             cursor.execute("""
-                CREATE TABLE plate_readings (
+                CREATE TABLE IF NOT EXISTS plate_readings (
                     file_path TEXT,
                     date TEXT,
                     hour REAL,
@@ -81,6 +80,7 @@ def find_conflicts(data_df):
                 _to_py(row['y']),
                 row['assay']
             )
+            logging.getLogger('plate_analyzer').debug(f"find_conflicts query params: {params}")
             cursor.execute(query, params)
             match = cursor.fetchone()
             if match:
@@ -110,13 +110,15 @@ def insert_records(data_df):
         return
 
         # Convert numpy scalar types to native Python types for SQLite compatibility
-    data_df = data_df.applymap(_to_py)
+    data_df = data_df.map(_to_py)
     data_df['update_datetime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     with get_db_connection() as conn:
         cols = list(data_df.columns)
         placeholders = ', '.join(['?'] * len(cols))
-        sql = f"INSERT OR REPLACE INTO plate_readings ({', '.join(cols)}) VALUES ({placeholders})"
+        # Use INSERT, not INSERT OR REPLACE. Conflicts should be handled before this function is called.
+        # Using INSERT will raise an IntegrityError if a conflict exists, which is safer than silent replacement.
+        sql = f"INSERT INTO plate_readings ({', '.join(cols)}) VALUES ({placeholders})"
         cursor = conn.cursor()
         records = [tuple(row) for row in data_df.to_numpy()]
         cursor.executemany(sql, records)
@@ -127,7 +129,7 @@ def replace_records(data_df):
     if data_df.empty:
         return
         # Convert numpy scalar types to native Python types for SQLite compatibility
-    data_df = data_df.applymap(_to_py)
+    data_df = data_df.map(_to_py)
     data_df['update_datetime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     with get_db_connection() as conn:

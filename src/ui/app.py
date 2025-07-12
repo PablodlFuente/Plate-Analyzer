@@ -1148,9 +1148,10 @@ class PlateMaskApp(ctk.CTk):
                     plate_values = row['data']
                     for i in range(8):      # row index
                         for j in range(12): # col index
-                            if mask[i, j] != 1:
+                            # A pocillo is only skipped if it's excluded AND not a negative control.
+                            if mask[i, j] == 0 and neg_ctrl_mask[i, j] == 0:
                                 continue
-                            well_name = f"{chr(ord('A') + i)}{j + 1}"
+                            well_name = f"{j + 1}{chr(ord('A') + i)}"
                             is_neg_control = int(neg_ctrl_mask[i, j] == 1)
                             section_index = well_to_section.get((i, j), -1)
                             dose = section_doses[section_index] if section_index != -1 else 0
