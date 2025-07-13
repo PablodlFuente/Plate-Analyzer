@@ -13,10 +13,9 @@ venv
 #otros
 analysis_output
 docs
-tmp
 logs
 last_masks.csv
 last_neg_ctrl_masks.csv
 section_grays.csv
 plate_data.db
-
+tmp
