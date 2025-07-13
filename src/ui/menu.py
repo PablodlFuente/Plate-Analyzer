@@ -78,7 +78,7 @@ class AppMenu:
         initial_dir = self.config.default_directory if self.config.default_directory else os.getcwd()
         file_path = filedialog.askopenfilename(
             title="Select Data File",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            filetypes=[("Excel files", ("*.xlsx", "*.xls")), ("All files", "*.*")],
             initialdir=initial_dir
         )
         

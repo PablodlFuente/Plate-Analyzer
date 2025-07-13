@@ -28,8 +28,9 @@ def df_to_graphpad_xml(df: pd.DataFrame, output_file: str):
     ET.SubElement(created, 'OriginalVersion', CreatedByProgram="PythonScript", CreatedByVersion="1.0", Login="", DateTime=pd.Timestamp.now().isoformat())
 
     # Agrupar por fecha y tabla
-    for (date, plate, assay), subdf in df.groupby(['date', 'plate', 'assay']):
+    for (plate, assay), subdf in df.groupby(['plate', 'assay']):
         table = ET.SubElement(root, 'Table', ID=f"Tbl_{plate}_{assay}", XFormat="none", YFormat="replicates", TableType="TwoWay")
+        max_replicates_in_table = 0
         ET.SubElement(table, 'Title').text = f"{plate}_{assay}"
 
         # Filas: horas ordenadas
@@ -41,21 +42,27 @@ def df_to_graphpad_xml(df: pd.DataFrame, output_file: str):
 
         # Cada dosis real
         for real_dose, grp in subdf.groupby('real_dose'):
-            # Precompute lists of values per hour
+            # Precompute list of values per hour (preserve order)
             hour_values = {h: grp[grp['hour'] == h]['value'].tolist() for h in hours}
-            max_len = max((len(vs) for vs in hour_values.values()), default=0)
-            ycol = ET.SubElement(table, 'YColumn', Subcolumns=str(max_len))
+            # Número de réplicas = máximo número de valores en cualquier hora
+            replicates = max((len(vs) for vs in hour_values.values()), default=0)
+            max_replicates_in_table = max(max_replicates_in_table, replicates)
+            ycol = ET.SubElement(table, 'YColumn', Subcolumns=str(replicates))
             ET.SubElement(ycol, 'Title').text = str(real_dose)
-            # Para cada hora, crear un Subcolumn con exactamente max_len <d>
-            for h in hours:
-                vals = hour_values[h]
+
+            # Crear un Subcolumn por réplica
+            for r in range(replicates):
                 sub = ET.SubElement(ycol, 'Subcolumn')
-                # Rellenar con valores y, si faltan, con <d/> vacíos
-                for v in vals:
-                    ET.SubElement(sub, 'd').text = str(v)
-                for _ in range(max_len - len(vals)):
-                    ET.SubElement(sub, 'd')
-    
+                # Añadir un valor por cada hora (o vacío si esta réplica no existe para esa hora)
+                for h in hours:
+                    vals = hour_values[h]
+                    if r < len(vals):
+                        ET.SubElement(sub, 'd').text = str(vals[r])
+                    else:
+                        ET.SubElement(sub, 'd')
+        # Añadir atributo Replicates al <Table>
+        table.set('Replicates', str(max_replicates_in_table))
+
     # Prettify y escribir
     xml_str = ET.tostring(root, encoding='utf-8')
     parsed = minidom.parseString(xml_str)
