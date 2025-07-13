@@ -141,6 +141,16 @@ def replace_records(data_df):
         cursor.executemany(sql, records)
         conn.commit()
 
+def get_all_records_as_df():
+    """Fetches all records from the plate_readings table into a pandas DataFrame."""
+    with get_db_connection() as conn:
+        try:
+            df = pd.read_sql_query("SELECT * FROM plate_readings", conn)
+            return df
+        except Exception as e:
+            logging.getLogger('plate_analyzer').error(f"Error fetching all records from DB: {e}")
+            return pd.DataFrame() # Return empty df on error
+
 def delete_all_records():
     """Delete ALL rows from plate_readings table. Use with extreme caution."""
     with get_db_connection() as conn:

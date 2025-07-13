@@ -42,6 +42,13 @@ class AppMenu:
         self._update_recent_files_menu()
 
         self.file_menu.add_separator()
+
+        # Export submenu
+        self.export_menu = tk.Menu(self.file_menu, tearoff=0)
+        self.file_menu.add_cascade(label="Export DB into", menu=self.export_menu)
+        self.export_menu.add_command(label="GraphPad XML...", command=lambda: self.parent.export_to_graphpad_xml_action())
+
+        self.file_menu.add_separator()
         self.file_menu.add_command(label="Exit", command=parent.on_closing)
 
         # Tools menu

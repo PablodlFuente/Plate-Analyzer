@@ -18,7 +18,9 @@ from src.ui.menu import AppMenu
 from src.utils.logger import setup_logging
 import os
 import tkinter as tk
-from src.modules.database import find_conflicts, insert_records, replace_records, detect_internal_duplicates
+from tkinter import filedialog, messagebox
+from src.modules import exporter
+from src.modules.database import find_conflicts, insert_records, replace_records, detect_internal_duplicates, get_all_records_as_df
 from src.ui.conflict_dialog import ConflictDialog
 import logging
 import re
@@ -1195,8 +1197,8 @@ class PlateMaskApp(ctk.CTk):
             else:
                 # Show conflicts dialog (side-by-side)
                 import logging
-                logging.getLogger('plate_analyzer').info('DB Conflicts DF (from DB):\n' + db_conflicts_df.to_string())
-                logging.getLogger('plate_analyzer').info('Incoming Conflicts DF (from file):\n' + incoming_conflicts_df.to_string())
+                logging.getLogger('plate_analyzer').info('DB Conflicts DF (from DB): ' + str(len(db_conflicts_df)))
+                logging.getLogger('plate_analyzer').info('Incoming Conflicts DF (from file): ' + str(len(incoming_conflicts_df)))
                 conflict_dialog = ConflictDialog(self, db_conflicts_df, incoming_conflicts_df)
                 user_choice = conflict_dialog.result
                 if user_choice == 'replace':
@@ -1220,3 +1222,38 @@ class PlateMaskApp(ctk.CTk):
             logging.getLogger('plate_analyzer').error(f"Error in save_to_db_action: {e}")
             self.result_box.insert(ctk.END, f"An error occurred: {e}\n")
             self.result_box.insert(ctk.END, traceback.format_exc())
+
+    def export_to_graphpad_xml_action(self):
+        """Handles the logic to export the entire database to a GraphPad XML file."""
+        try:
+            self.result_box.insert(ctk.END, "Exporting database to GraphPad XML...\n")
+            
+            # 1. Fetch data from DB
+            df = get_all_records_as_df()
+            if df.empty:
+                messagebox.showinfo("Export Info", "The database is empty. Nothing to export.")
+                self.result_box.insert(ctk.END, "Export cancelled: Database is empty.\n")
+                return
+
+            # 2. Ask for output file path
+            file_path = filedialog.asksaveasfilename(
+                title="Save GraphPad XML File",
+                defaultextension=".xml",
+                filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
+            )
+
+            if not file_path:
+                self.result_box.insert(ctk.END, "Export cancelled by user.\n")
+                return
+
+            # 3. Call exporter function
+            exporter.df_to_graphpad_xml(df, file_path)
+            
+            messagebox.showinfo("Export Success", f"Database successfully exported to:\n{file_path}")
+            self.result_box.insert(ctk.END, f"Database successfully exported to {file_path}\n")
+
+        except Exception as e:
+            import traceback
+            logging.getLogger('plate_analyzer').error(f"Error during GraphPad XML export: {e}")
+            messagebox.showerror("Export Error", f"An error occurred during export: {e}")
+            self.result_box.insert(ctk.END, f"An error occurred during export: {e}\n{traceback.format_exc()}\n")
