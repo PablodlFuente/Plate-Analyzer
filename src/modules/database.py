@@ -24,6 +24,7 @@ def create_table():
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS plate_readings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     file_path TEXT,
                     date TEXT,
                     hour REAL,
@@ -37,7 +38,7 @@ def create_table():
                     value REAL,
                     is_neg_control INTEGER,
                     update_datetime TEXT,
-                    PRIMARY KEY (date, hour, plate, x, y, assay)
+                    UNIQUE (date, hour, plate, x, y, assay)
                 )
             """)
             conn.commit()
