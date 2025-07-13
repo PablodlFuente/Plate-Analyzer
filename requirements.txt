@@ -1,16 +1,8 @@
-# Core scientific stack
 numpy>=1.23.0
-pandas>=2.0.0
+plotly==5.22.0
 scipy>=1.10.0
-
-# Visualization
-plotly>=5.18.0
-
-# GUI
+pandas>=2.0.0
 customtkinter>=5.1.0
-pillow>=9.5.0  # dependencia de CustomTkinter
-
-# Excel I/O
+mysql-connector-python
 openpyxl>=3.1.0
-
-
+Pillow>=9.5.0
