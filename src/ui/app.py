@@ -734,10 +734,6 @@ class PlateMaskApp(ctk.CTk):
             copy_callback=self.copy_grays_to_all_plates
         )
         self.section_legend.pack(pady=(0, 10), fill="x")
-        # Añadir nombres de sección como etiquetas
-        for idx, entry in enumerate(self.section_legend.gray_entries):
-            if idx < len(self.section_names):
-                entry.insert(0, f" ({self.section_names[idx]})")
         self.well_status_legend = WellStatusLegend(
             parent=self.legend_frame
         )

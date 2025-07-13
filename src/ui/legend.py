@@ -57,8 +57,7 @@ class SectionLegend(ctk.CTkFrame):
             section_label.pack(side="left", padx=5)
             
             # Gray value entry
-            gray_entry = ctk.CTkEntry(row_frame, width=60)
-            gray_entry.insert(0, str(self.section_grays[i]))
+            gray_entry = ctk.CTkEntry(row_frame, width=60, placeholder_text="0")
             gray_entry.pack(side="left", padx=5)
             self.gray_entries.append(gray_entry)
             

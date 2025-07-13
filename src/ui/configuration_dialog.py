@@ -18,7 +18,7 @@ class ConfigurationDialog(ctk.CTkToplevel):
         """
         super().__init__(parent)
         self.title("Configuration")
-        self.geometry("400x600")
+        self.geometry("400x400")
         self.resizable(False, True)
         
         self.config = config
@@ -28,9 +28,12 @@ class ConfigurationDialog(ctk.CTkToplevel):
         self.transient(parent)
         self.grab_set()
         
-        # Create main frame
-        self.main_frame = ctk.CTkFrame(self)
-        self.main_frame.pack(padx=20, pady=20, fill="both", expand=True)
+        # Create a scrollable frame for the content
+        self.scrollable_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scrollable_frame.pack(padx=20, pady=20, fill="both", expand=True)
+
+        # Use the scrollable frame as the parent for all widgets
+        self.main_frame = self.scrollable_frame
         
         # Section units configuration
         units_label = ctk.CTkLabel(self.main_frame, text="Section Units:")
